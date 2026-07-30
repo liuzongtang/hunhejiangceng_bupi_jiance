@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Data & outputs
+checkpoints/
+data/
+logs/
+runs/
+*.db
+*.sqlite
+
+# Deployment artifacts
+deploy/
+
+# Environment
+.env
+.env.local
+
+# OS
+Thumbs.db
+.DS_Store
