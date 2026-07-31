@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>产线模拟器 — 织物瑕疵检测</title>
+<style>
+:root{--bg:#0a0f1e;--bg2:#111827;--bg3:#1f2937;--text:#e5e7eb;--text2:#9ca3af;--accent:#38bdf8;--green:#22c55e;--red:#ef4444;--orange:#f97316;--yellow:#eab308}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh}
+.header{background:var(--bg2);border-bottom:2px solid var(--accent);padding:0 20px;height:50px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:16px}
+.controls{display:flex;gap:10px;align-items:center}
+.controls button{padding:6px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.2s}
+.btn-start{background:var(--green);color:#000}
+.btn-start:hover{opacity:.8}
+.btn-stop{background:var(--red);color:#fff}
+.btn-stop:hover{opacity:.8}
+.speed-slider{width:80px;accent-color:var(--accent)}
+.main{display:grid;grid-template-columns:1fr 300px;height:calc(100vh - 50px)}
+.center{display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.fabric-stage{position:relative;width:640px;height:480px;border:2px solid var(--bg3);border-radius:8px;overflow:hidden;background:#1a1a2e}
+.fabric-stage canvas{display:block}
+.overlay{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.7);padding:4px 10px;border-radius:4px;font-size:12px}
+.defect-box{position:absolute;border:2px solid;border-radius:4px;animation:pulse .8s ease-out;pointer-events:none}
+.defect-box.critical{border-color:var(--red);box-shadow:0 0 8px var(--red)}
+.defect-box.major{border-color:var(--orange);box-shadow:0 0 8px var(--orange)}
+.defect-box.medium{border-color:var(--yellow)}
+.defect-box.minor{border-color:var(--accent)}
+.defect-label{position:absolute;top:-18px;left:0;font-size:10px;padding:1px 5px;border-radius:3px;white-space:nowrap;color:#fff}
+.defect-label.critical{background:var(--red)}.defect-label.major{background:var(--orange)}.defect-label.medium{background:var(--yellow);color:#000}.defect-label.minor{background:var(--accent);color:#000}
+@keyframes pulse{0%{transform:scale(1.1);opacity:.8}100%{transform:scale(1);opacity:1}}
+.sidebar{background:var(--bg2);padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px}
+.sidebar h3{font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.stat-row{display:flex;justify-content:space-between;font-size:14px;padding:4px 0;border-bottom:1px solid var(--bg3)}
+.stat-row .val{font-weight:700}
+.stat-row .val.green{color:var(--green)}.stat-row .val.red{color:var(--red)}.stat-row .val.accent{color:var(--accent)}
+.alert-mini{padding:6px 8px;border-radius:4px;font-size:11px;border-left:3px solid;margin-bottom:4px}
+.alert-mini.critical{border-color:var(--red);background:rgba(239,68,68,.1)}
+.alert-mini.major{border-color:var(--orange);background:rgba(249,115,22,.1)}
+.pipeline{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:12px;font-size:10px}
+.pipe-step{background:var(--bg3);padding:4px 8px;border-radius:4px;color:var(--text2)}
+.pipe-arrow{color:var(--accent)}
+.pipe-step.active{background:var(--accent);color:#000;font-weight:600}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>产线模拟器 — 织物瑕疵检测系统</h1>
+  <div class="controls">
+    <span style="font-size:12px;color:var(--text2)">速度:</span>
+    <input type="range" class="speed-slider" min="1" max="20" value="5" id="speed">
+    <button class="btn-start" onclick="startSim()" id="btnStart">开始</button>
+    <button class="btn-stop" onclick="stopSim()" id="btnStop" disabled>停止</button>
+  </div>
+</div>
+
+<div class="main">
+<div class="center">
+  <div class="fabric-stage" id="stage">
+    <canvas id="fabricCanvas" width="640" height="480"></canvas>
+  </div>
+  <div class="pipeline" style="margin-top:12px" id="pipeline">
+    <span class="pipe-step" id="step1">图像采集</span><span class="pipe-arrow">→</span>
+    <span class="pipe-step" id="step2">预处理</span><span class="pipe-arrow">→</span>
+    <span class="pipe-step" id="step3">推理检测</span><span class="pipe-arrow">→</span>
+    <span class="pipe-step" id="step4">图像存储</span><span class="pipe-arrow">→</span>
+    <span class="pipe-step" id="step5">告警推送</span>
+  </div>
+</div>
+
+<div class="sidebar">
+  <div><h3>产线状态</h3>
+    <div class="stat-row"><span>线速度</span><span class="val accent" id="lineSpeed">45.6 m/min</span></div>
+    <div class="stat-row"><span>状态</span><span class="val green" id="lineStatus">运行中</span></div>
+    <div class="stat-row"><span>批次</span><span class="val" id="batchNum">--</span></div>
+  </div>
+  <div><h3>检测统计</h3>
+    <div class="stat-row"><span>检测图像</span><span class="val accent" id="imgCount">0</span></div>
+    <div class="stat-row"><span>检出缺陷</span><span class="val red" id="defCount">0</span></div>
+    <div class="stat-row"><span>缺陷率</span><span class="val" id="defRate">0%</span></div>
+  </div>
+  <div><h3>告警推送</h3><div id="alertFeed" style="max-height:200px;overflow-y:auto"><span style="color:var(--text2)">等待中...</span></div></div>
+  <div><h3>缺陷类型分布</h3><div id="defectTypes"></div></div>
+</div>
+</div>
+
+<script>
+const canvas=document.getElementById('fabricCanvas');
+const ctx=canvas.getContext('2d');
+let running=false,timer=null,imgCount=0,defCount=0,defTypes={};
+const DEFECTS=['broken_yarn','hole','stain','missing_stitch','color_diff','skip_stitch','thin_yarn'];
+const DEFECT_NAMES={broken_yarn:'断纱',hole:'破洞',stain:'污渍',missing_stitch:'漏针',color_diff:'色差',skip_stitch:'跳针',thin_yarn:'细节'};
+const SEV_NAMES={critical:'严重',major:'主要',medium:'中等',minor:'轻微'};
+
+function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+function hsl(h,s,l){return `hsl(${h},${s}%,${l}%)`;}
+
+function drawFabric(withDefect){
+  const img=ctx.createImageData(640,480);
+  const baseHue=rand(30,40);
+  for(let y=0;y<480;y++){
+    for(let x=0;x<640;x++){
+      const i=(y*640+x)*4;
+      const weave=(Math.sin(x*0.05+y*0.02)*15+Math.sin(y*0.08)*10);
+      const v=128+weave+(Math.random()-0.5)*8;
+      img.data[i]=Math.min(255,Math.max(0,v+rand(-3,3)));
+      img.data[i+1]=Math.min(255,Math.max(0,v+rand(-2,2)));
+      img.data[i+2]=Math.min(255,Math.max(0,v+rand(-4,4)));
+      img.data[i+3]=255;
+    }
+  }
+  ctx.putImageData(img,0,0);
+
+  if(withDefect&&Math.random()<0.7){
+    const type=DEFECTS[rand(0,DEFECTS.length-1)];
+    drawDefect(type);
+  }
+}
+
+function drawDefect(type){
+  const x=rand(80,500),y=rand(60,380);
+  ctx.save();
+  if(type==='broken_yarn'){
+    ctx.strokeStyle='#1a1a2e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);
+    for(let i=1;i<rand(30,100);i++){ctx.lineTo(Math.min(630,Math.max(10,x+rand(-3,4)*i)),Math.min(470,Math.max(10,y+rand(-2,3)*i)));}
+    ctx.stroke();
+  }else if(type==='hole'){
+    const r=rand(10,30);const grad=ctx.createRadialGradient(x,y,0,x,y,r);
+    grad.addColorStop(0,'#0a0a0f');grad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  }else if(type==='stain'){
+    const r=rand(15,35);ctx.fillStyle='rgba(80,50,20,.25)';ctx.beginPath();
+    for(let i=0;i<12;i++){const a=i/12*Math.PI*2;const dr=r+rand(-8,8);ctx.lineTo(x+Math.cos(a)*dr,y+Math.sin(a)*dr);}
+    ctx.closePath();ctx.fill();
+  }else if(type==='missing_stitch'){
+    ctx.fillStyle='#d0d0d8';ctx.fillRect(x,y,rand(30,70),rand(3,6));
+  }else if(type==='color_diff'){
+    ctx.fillStyle='rgba(30,0,0,.15)';ctx.beginPath();ctx.arc(x,y,rand(25,50),0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+
+  // Show bounding box overlay
+  const stage=document.getElementById('stage');
+  const box=document.createElement('div');
+  const sev=['critical','major','medium','minor'][rand(0,3)];
+  box.className=`defect-box ${sev}`;
+  box.style.left=(x-rand(10,30))+'px';
+  box.style.top=(y-rand(10,25))+'px';
+  box.style.width=rand(30,100)+'px';
+  box.style.height=rand(20,60)+'px';
+  const label=document.createElement('div');
+  label.className=`defect-label ${sev}`;
+  label.textContent=(DEFECT_NAMES[type]||type)+' ['+SEV_NAMES[sev]+']';
+  box.appendChild(label);
+  stage.appendChild(box);
+  setTimeout(()=>box.remove(),2000);
+
+  // Update stats
+  defCount++;
+  defTypes[type]=(defTypes[type]||0)+1;
+  addAlert(type,sev);
+}
+
+function addAlert(type,sev){
+  const feed=document.getElementById('alertFeed');
+  if(feed.querySelector('span')) feed.innerHTML='';
+  const div=document.createElement('div');
+  div.className=`alert-mini ${sev}`;
+  div.innerHTML=`<b>${DEFECT_NAMES[type]||type}</b><br><span style="color:var(--text2);font-size:10px">${SEV_NAMES[sev]} | ${new Date().toLocaleTimeString('zh-CN')}</span>`;
+  feed.insertBefore(div,feed.firstChild);
+  if(feed.children.length>15) feed.removeChild(feed.lastChild);
+}
+
+function updateStats(){
+  imgCount++;
+  document.getElementById('imgCount').textContent=imgCount;
+  document.getElementById('defCount').textContent=defCount;
+  document.getElementById('defRate').textContent=(defCount/imgCount*100).toFixed(1)+'%';
+  document.getElementById('batchNum').textContent='批次-'+String(imgCount).padStart(4,'0');
+  // Defect types bar
+  const types=Object.entries(defTypes).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('defectTypes').innerHTML=types.map(([t,c])=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 0"><span>${DEFECT_NAMES[t]||t}</span><span style="color:var(--accent)">${c}个</span></div>`).join('')||'--';
+}
+
+function flashStep(n){
+  for(let i=1;i<=5;i++) document.getElementById('step'+i).classList.remove('active');
+  document.getElementById('step'+n).classList.add('active');
+}
+
+function step(){
+  drawFabric(true);
+  updateStats();
+  flashStep(1);setTimeout(()=>flashStep(2),200);
+  setTimeout(()=>flashStep(3),400);setTimeout(()=>flashStep(4),600);setTimeout(()=>flashStep(5),800);
+}
+
+function startSim(){
+  running=true;
+  document.getElementById('btnStart').disabled=true;
+  document.getElementById('btnStop').disabled=false;
+  document.getElementById('lineStatus').textContent='运行中';
+  document.getElementById('lineStatus').className='val green';
+  const speed=parseInt(document.getElementById('speed').value);
+  const interval=Math.max(200,2000/speed);
+  document.getElementById('lineSpeed').textContent=(40+speed*3).toFixed(1)+' m/min';
+  function loop(){if(!running)return;step();timer=setTimeout(loop,interval);}
+  loop();
+}
+
+function stopSim(){
+  running=false;
+  clearTimeout(timer);
+  document.getElementById('btnStart').disabled=false;
+  document.getElementById('btnStop').disabled=true;
+  document.getElementById('lineStatus').textContent='已停止';
+  document.getElementById('lineStatus').className='val red';
+}
+
+// Draw initial fabric
+drawFabric(false);
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+# Backend Configuration for Textile Defect Detection System
+# Environment: development
+
+database:
+  host: localhost
+  port: 5432
+  name: fabric_defect
+  user: postgres
+  password: postgres
+  echo: false
+
+minio:
+  endpoint: localhost:9000
+  access_key: minioadmin
+  secret_key: minioadmin
+  bucket: fabric-images
+  secure: false
+
+model:
+  current_version: v1.0.0
+  model_type: yolov8_defect
+  model_path: ./models/yolov8_defect_v1.0.0.onnx
+  confidence_threshold: 0.5
+  nms_iou_threshold: 0.45
+  device: cpu
+
+alert:
+  broken_yarn_action: immediate_stop
+  missing_stitch_action: immediate_stop
+  critical_severity_action: stop_machine
+  major_severity_action: mark_roll
+  minor_severity_action: log_only
+  mqtt_broker: localhost
+  mqtt_port: 1883
+  mqtt_topic: fabric/defect/alert
+
+server:
+  host: 0.0.0.0
+  port: 8000
+  workers: 1
+  reload: true
+  log_level: info
+
+debug: true
+environment: development

@@ -1,0 +1,44 @@
+# Training Configuration for Hybrid Reward Defect Detection
+# Section 5.4 of the project document
+
+training:
+  epochs: 200
+  batch_size: 16
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  scheduler: cosine
+  warmup_epochs: 5
+
+  # Hybrid reward parameters
+  hybrid_reward:
+    num_dimensions: 7
+    lambda_miss: 1.5       # Miss detection penalty coefficient
+    lambda_fp: 1.0         # False positive penalty coefficient
+    beta: 0.1              # Scalar reward weight in total loss
+    gamma: 0.05            # Consistency loss weight
+    alpha: 0.3             # Consistency reward coefficient
+    weight_update_freq: 5  # Adaptive weight update frequency (epochs)
+
+  # Data augmentation
+  augmentation:
+    random_flip: 0.5
+    random_rotate: 15
+    color_jitter: [0.3, 0.3, 0.3]
+    mosaic: 0.5
+    mixup: 0.3
+
+  # Early stopping
+  early_stopping:
+    patience: 20
+    min_delta: 0.001
+    monitor: val_scalar_reward
+
+# Monitoring targets (Section 5.5)
+targets:
+  mAP50: 0.95
+  recall: 0.95
+  dim_loc: 0.9
+  dim_cls: 0.95
+  dim_broken: 0.95
+  dim_stitch: 0.90
+  consistency_loss: 0.0

@@ -1,0 +1,28 @@
+# Textile Defect Detection Backend
+# FastAPI + SQLAlchemy + PostgreSQL + MinIO
+
+# Web Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.30
+asyncpg>=0.29.0          # PostgreSQL async driver
+aiosqlite>=0.20.0        # SQLite async driver (dev/test)
+
+# Validation
+pydantic>=2.7.0
+
+# Storage
+minio>=7.2.0
+
+# System Monitoring
+psutil>=5.9.0
+
+# Config
+pyyaml>=6.0
+
+# Testing
+httpx>=0.27.0            # For TestClient async
+pytest>=7.4.0
+pytest-asyncio>=0.23.0

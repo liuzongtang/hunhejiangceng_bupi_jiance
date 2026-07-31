@@ -1,0 +1,131 @@
+# ============================================================================
+# Mixed Reward + Standard PPO Configuration
+# ============================================================================
+# Uses standard PPO with a critic model (GAE advantage estimation).
+# This is the full formulation with value function.
+#
+# Usage:
+#   python scripts/train_mixed_reward.py --mode verl --config configs/mixed_reward_ppo.yaml
+# ============================================================================
+
+defaults:
+  - _self_
+
+# ============================================================================
+# Model Configuration
+# ============================================================================
+model:
+  path: "Qwen/Qwen2.5-1.5B-Instruct"
+  tokenizer_path: null
+  trust_remote_code: true
+
+# ============================================================================
+# Algorithm Configuration
+# ============================================================================
+algorithm:
+  # Standard GAE for PPO
+  adv_estimator: "gae"
+
+  # GAE parameters
+  gamma: 0.99
+  lambd: 0.95
+
+  # PPO clipping
+  clip_ratio: 0.2
+
+  # KL control
+  use_kl_in_reward: true
+  kl_penalty: "kl"
+  kl_coef: 0.02
+
+  # Adaptive KL controller
+  kl_controller:
+    type: "adaptive"
+    target_kl: 0.01
+
+# ============================================================================
+# Training Configuration
+# ============================================================================
+training:
+  total_epochs: 1
+  total_training_steps: 1000
+  save_freq: 200
+  eval_freq: 100
+
+  batch_size: 64
+  mini_batch_size: 16
+
+  # PPO epochs per batch
+  ppo_epochs: 1
+
+  # Optimizer
+  optimizer:
+    lr: 1.0e-6
+    betas: [0.9, 0.999]
+    weight_decay: 0.01
+
+  lr_scheduler: "cosine"
+  warmup_steps: 50
+
+  max_grad_norm: 1.0
+
+# ============================================================================
+# Mixed Reward Configuration
+# ============================================================================
+mixed_reward:
+  enabled: true
+
+  dimensions:
+    - accuracy
+    - safety
+    - completeness
+    - format
+
+  weights: [1.0, 1.0, 0.5, 0.5]
+
+  beta: 0.1
+
+  dimension_state:
+    init_value: 1.0
+    d_min: 0.5
+    d_max: 2.0
+    forget_factor: 0.999
+    learning_rate: 0.01
+    use_baseline: true
+    baseline_momentum: 0.99
+
+  modulation:
+    modulate_advantages: true
+    per_param_group: true
+
+# ============================================================================
+# Reward Function (verl plugin)
+# ============================================================================
+custom_reward_function:
+  path: "mixed_reward.reward_manager.multi_dimensional"
+  name: "compute_multi_dimensional_score"
+  reward_kwargs:
+    dimensions: ["accuracy", "safety", "completeness", "format"]
+    weights: [1.0, 1.0, 0.5, 0.5]
+
+# ============================================================================
+# Visualization
+# ============================================================================
+visualization:
+  wandb:
+    enabled: true
+    project: "mixed-reward-rlhf"
+    entity: null
+  tensorboard:
+    enabled: true
+    log_dir: "./runs/mixed_reward_ppo"
+  log_interval: 10
+  heatmap_interval: 100
+
+# ============================================================================
+# Experiment Metadata
+# ============================================================================
+experiment:
+  name: "exp_b_dynamic_ppo"
+  description: "Full mixed reward with standard PPO + critic"
+  seed: 42

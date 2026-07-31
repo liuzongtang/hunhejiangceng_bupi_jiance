@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>织物瑕疵检测 — 实时监控看板</title>
+<script src="/static/chart.min.js"></script>
+<style>
+:root{--bg:#0f172a;--bg2:#1e293b;--bg3:#334155;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#22c55e;--red:#ef4444;--orange:#f97316;--yellow:#eab308}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Microsoft YaHei','Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:var(--bg2);border-bottom:2px solid var(--accent);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:18px;font-weight:600}
+.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--bg3);padding:0 16px}
+.tab{padding:12px 20px;cursor:pointer;border-bottom:2px solid transparent;color:var(--text2);font-size:14px}
+.tab:hover{color:var(--text)}.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.content{padding:20px;max-width:1400px;margin:0 auto}
+.panel{display:none}.panel.active{display:block}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.card{background:var(--bg2);border-radius:10px;padding:18px;border:1px solid var(--bg3)}
+.card h3{font-size:13px;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}
+.card .value{font-size:28px;font-weight:700}
+.green{color:var(--green)}.red{color:var(--red)}.accent{color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 12px;color:var(--text2);border-bottom:1px solid var(--bg3)}
+td{padding:8px 12px;border-bottom:1px solid rgba(51,65,85,.5)}
+.badge{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge.critical{background:var(--red);color:#fff}.badge.major{background:var(--orange);color:#fff}
+.badge.medium{background:var(--yellow);color:#000}.badge.minor{background:var(--accent);color:#000}
+.alert-item{padding:10px 14px;border-radius:6px;margin-bottom:8px;border-left:4px solid;font-size:13px}
+.alert-item.critical{border-color:var(--red);background:rgba(239,68,68,.1)}
+.alert-item.major{border-color:var(--orange);background:rgba(249,115,22,.1)}
+.chart-wrap{position:relative;height:260px}.chart-wrap canvas{width:100%!important}
+.range-bar{display:flex;gap:8px;margin-bottom:16px}
+.range-btn{padding:6px 14px;border-radius:6px;border:1px solid var(--bg3);background:var(--bg2);color:var(--text2);cursor:pointer;font-size:13px}
+.range-btn.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.dash-input{background:var(--bg);border:1px solid var(--bg3);color:var(--text);padding:6px 10px;border-radius:4px}
+.dash-btn{padding:6px 14px;border-radius:4px;border:none;cursor:pointer;font-weight:600;font-size:13px}
+.dash-btn.accent{background:var(--accent);color:#000}.dash-btn.green{background:var(--green);color:#000}
+.status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px}
+.status-dot.online{background:var(--green);box-shadow:0 0 6px var(--green)}
+.status-dot.offline{background:var(--red)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>织物瑕疵检测系统</h1>
+  <div style="display:flex;align-items:center;gap:16px">
+    <span id="health"></span>
+    <span style="font-size:12px;color:var(--text2)" id="clock"></span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" id="tab-overview" onclick="switchTab('overview')">总览</div>
+  <div class="tab" id="tab-detection" onclick="switchTab('detection')">检测</div>
+  <div class="tab" id="tab-alerts" onclick="switchTab('alerts')">告警</div>
+  <div class="tab" id="tab-model" onclick="switchTab('model')">模型</div>
+  <div class="tab" id="tab-storage" onclick="switchTab('storage')">存储</div>
+</div>
+
+<div class="content">
+<!-- OVERVIEW -->
+<div id="panel-overview" class="panel active">
+  <div class="grid4" id="kpi-cards"></div>
+  <div class="card" style="margin-top:16px"><h3>缺陷趋势 (24小时)</h3><div class="chart-wrap" style="height:300px"><canvas id="trendChart"></canvas></div></div>
+  <div class="grid3" style="margin-top:16px">
+    <div class="card"><h3>缺陷类型分布</h3><div class="chart-wrap"><canvas id="typeChart"></canvas></div></div>
+    <div class="card"><h3>严重度分布</h3><div class="chart-wrap"><canvas id="sevDonut"></canvas></div></div>
+    <div class="card" id="alert-summary-card"><h3>告警汇总 (24h)</h3></div>
+  </div>
+</div>
+
+<!-- DETECTION -->
+<div id="panel-detection" class="panel">
+  <div class="range-bar" id="det-range"></div>
+  <div class="grid2">
+    <div class="card"><h3>检测趋势</h3><div class="chart-wrap"><canvas id="detTrendChart"></canvas></div></div>
+    <div class="card"><h3>缺陷类型趋势</h3><div class="chart-wrap"><canvas id="heatmapChart"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:16px"><h3>最近报告</h3><table><thead><tr><th>报告ID</th><th>设备</th><th>缺陷数</th><th>类型</th><th>告警</th><th>时间</th></tr></thead><tbody id="report-list"></tbody></table></div>
+</div>
+
+<!-- ALERTS -->
+<div id="panel-alerts" class="panel">
+  <div class="range-bar" id="alert-range"></div>
+  <div class="grid2">
+    <div class="card"><h3>告警时间轴</h3><div class="chart-wrap"><canvas id="alertTimeChart"></canvas></div></div>
+    <div class="card"><h3>告警频率</h3><div class="chart-wrap"><canvas id="alertFreqChart"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:16px"><h3>告警列表</h3><div id="alert-feed"></div></div>
+</div>
+
+<!-- MODEL -->
+<div id="panel-model" class="panel">
+  <div class="grid3" id="model-cards"></div>
+  <div class="card" style="margin-top:16px"><h3>注册新模型</h3>
+    <div style="display:flex;gap:8px">
+      <input class="dash-input" id="newModelId" placeholder="模型ID" style="flex:1">
+      <input class="dash-input" id="newModelAcc" placeholder="准确率" value="0.96" style="width:80px">
+      <button class="dash-btn green" onclick="registerModel()">注册</button>
+    </div>
+    <div style="font-size:12px;margin-top:6px;color:var(--text2)" id="modelRegStatus"></div>
+  </div>
+  <div class="card" style="margin-top:16px"><h3>版本历史</h3><table><thead><tr><th>模型ID</th><th>类型</th><th>准确率</th><th>mAP@50</th><th>状态</th><th>发布</th></tr></thead><tbody id="model-history"></tbody></table></div>
+</div>
+
+<!-- STORAGE -->
+<div id="panel-storage" class="panel">
+  <div class="grid2">
+    <div class="card"><h3>上传图像</h3>
+      <input type="file" id="uploadFile" accept="image/*" style="color:var(--text);margin:8px 0;width:100%">
+      <input class="dash-input" id="uploadDevice" value="CAM-001" style="width:100%;margin-bottom:4px" placeholder="设备ID">
+      <button class="dash-btn accent" onclick="uploadImage()" style="width:100%">上传</button>
+      <div style="font-size:12px;margin-top:8px;color:var(--text2)" id="uploadStatus"></div>
+    </div>
+    <div class="card"><h3>运行推理</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">对已上传图像运行检测</p>
+      <input class="dash-input" id="inferDevice" value="CAM-001" style="width:100%;margin-bottom:4px">
+      <button class="dash-btn green" onclick="runInference()" style="width:100%">推理</button>
+      <div style="font-size:12px;margin-top:8px;color:var(--text2)" id="inferStatus"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px"><h3>已存储图像</h3>
+    <button class="dash-btn" style="background:var(--bg3);color:var(--text);margin-bottom:8px" onclick="loadStorageImages()">刷新</button>
+    <table><thead><tr><th>文件名</th><th>大小</th><th>操作</th></tr></thead><tbody id="storage-list"></tbody></table>
+  </div>
+</div>
+
+<div style="font-size:12px;color:var(--text2);text-align:right;margin-top:12px">自动刷新: 5秒 | <span id="last-update"></span></div>
+</div>
+
+<script>
+var charts={};
+function desChart(n){if(charts[n]){charts[n].destroy();delete charts[n];}}
+function setChart(n,c){desChart(n);charts[n]=c;}
+async function api(p){try{var r=await fetch(p);return r.ok?r.json():null}catch(e){return null}}
+
+function switchTab(n){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('tab-'+n).classList.add('active');
+  document.getElementById('panel-'+n).classList.add('active');
+  if(n==='detection'){loadDetection('24h');renderRange('det-range','detection');}
+  if(n==='alerts'){renderRange('alert-range','alerts');}
+  if(n==='model') loadModel();
+  if(n==='storage') loadStorageImages();
+}
+
+function badge(s){return '<span class=\"badge '+(s||'minor')+'\">'+(s||'minor')+'</span>';}
+
+function renderRange(cid,target){
+  var ranges=[{v:'1h',t:'1小时'},{v:'24h',t:'24小时'},{v:'7d',t:'7天'},{v:'30d',t:'30天'}];
+  var cur=document.getElementById(cid).getAttribute('data-range')||'24h';
+  var html='';
+  for(var i=0;i<ranges.length;i++){
+    var r=ranges[i];
+    var cls=r.v===cur?'range-btn active':'range-btn';
+    html+='<button class=\"'+cls+'\" data-range=\"'+r.v+'\" data-cid=\"'+cid+'\" data-target=\"'+target+'\">'+r.t+'</button>';
+  }
+  document.getElementById(cid).innerHTML=html;
+  document.getElementById(cid).onclick=function(e){
+    if(e.target.tagName==='BUTTON'){
+      var btn=e.target;
+      document.getElementById(btn.getAttribute('data-cid')).setAttribute('data-range',btn.getAttribute('data-range'));
+      var fnName='load'+btn.getAttribute('data-target').charAt(0).toUpperCase()+btn.getAttribute('data-target').slice(1);
+      window[fnName](btn.getAttribute('data-range'));
+      var btns=document.getElementById(btn.getAttribute('data-cid')).querySelectorAll('.range-btn');
+      for(var j=0;j<btns.length;j++) btns[j].classList.remove('active');
+      btn.classList.add('active');
+    }
+  };
+}
+
+// === OVERVIEW ===
+async function loadOverview(){
+  var s=await api('/api/v1/system/status');
+  var st=await api('/api/v1/system/stats?time_range=24h');
+  if(!s||!s.data) return;
+  var d=s.data,sd=st&&st.data?st.data:{};
+  var devs=d.devices||[],online=devs.filter(function(x){return x.status==='online'}).length;
+  document.getElementById('kpi-cards').innerHTML=
+    '<div class=\"card\"><h3>在线设备</h3><div class=\"value green\">'+online+'/'+devs.length+'</div></div>'+
+    '<div class=\"card\"><h3>检测总数</h3><div class=\"value accent\">'+(sd.total_defects||0).toLocaleString()+'</div></div>'+
+    '<div class=\"card\"><h3>告警 (24h)</h3><div class=\"value '+(sd.alerts_triggered>0?'red':'green')+'\">'+(sd.alerts_triggered||0)+'</div></div>'+
+    '<div class=\"card\"><h3>模型版本</h3><div class=\"value\" style=\"font-size:20px\">'+(d.model?d.model.current_version:'N/A')+'</div></div>';
+  var trend=sd.trend||{labels:[],data:[]};
+  setChart('trend',new Chart(document.getElementById('trendChart'),{type:'line',data:{labels:trend.labels,datasets:[{label:'缺陷/小时',data:trend.data,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,.1)',fill:true,tension:.3}]},options:{responsive:true,maintainAspectRatio:false}}));
+  var types=sd.by_type||{};
+  if(Object.keys(types).length){
+    setChart('type',new Chart(document.getElementById('typeChart'),{type:'bar',data:{labels:Object.keys(types),datasets:[{label:'数量',data:Object.values(types),backgroundColor:['#ef4444','#f97316','#eab308','#22c55e','#38bdf8','#8b5cf6','#ec4899','#14b8a6']}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}));
+  }
+  var sevs=sd.by_severity||{};
+  if(Object.keys(sevs).length){
+    setChart('sevDonut',new Chart(document.getElementById('sevDonut'),{type:'doughnut',data:{labels:Object.keys(sevs),datasets:[{data:Object.values(sevs),backgroundColor:['#ef4444','#f97316','#eab308','#38bdf8','#94a3b8']}]},options:{responsive:true,maintainAspectRatio:false}}));
+  }
+  document.getElementById('alert-summary-card').innerHTML='<h3>告警汇总 (24h)</h3><div style=\"font-size:40px;font-weight:700;text-align:center;padding:20px\" class=\"'+(sd.alerts_triggered>0?'red':'green')+'\">'+(sd.alerts_triggered||0)+'</div><p style=\"text-align:center;color:var(--text2)\">次告警触发</p>';
+}
+
+// === DETECTION ===
+async function loadDetection(range){
+  range=range||document.getElementById('det-range').getAttribute('data-range')||'24h';
+  document.getElementById('det-range').setAttribute('data-range',range);
+  var d=await api('/api/v1/detection/reports?limit=50');
+  var st=await api('/api/v1/system/stats?time_range='+range);
+  if(!d||!d.data) return;
+  var reports=d.data||[],sd=st&&st.data?st.data:{};
+  var trend=sd.trend||{labels:[],data:[]};
+  setChart('detTrend',new Chart(document.getElementById('detTrendChart'),{type:'line',data:{labels:trend.labels,datasets:[{label:'缺陷',data:trend.data,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.1)',fill:true,tension:.3}]},options:{responsive:true,maintainAspectRatio:false}}));
+  var typesList=[];
+  reports.forEach(function(r){if(r.by_type) Object.keys(r.by_type).forEach(function(t){if(typesList.indexOf(t)<0) typesList.push(t);});});
+  typesList=typesList.slice(0,8);
+  var labels=sd.trend?sd.trend.labels.slice(-12):[];
+  if(typesList.length&&labels.length){
+    var matrix=typesList.map(function(t){return labels.map(function(){return 0;});});
+    setChart('heatmap',new Chart(document.getElementById('heatmapChart'),{type:'bar',data:{labels:labels,datasets:typesList.map(function(t,i){return {label:t,data:matrix[i],backgroundColor:['#ef4444','#f97316','#eab308','#22c55e','#38bdf8','#8b5cf6','#ec4899','#14b8a6'][i]||'#94a3b8'};})},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true}}}}));
+  }
+  document.getElementById('report-list').innerHTML=reports.slice(0,20).map(function(r){
+    return '<tr><td>'+r.report_id+'</td><td>'+r.device_id+'</td><td>'+r.total_defects+'</td><td>'+(r.by_type?Object.entries(r.by_type).map(function(e){return e[0]+':'+e[1];}).join(', '):'--')+'</td><td>'+(r.alarm&&r.alarm.triggered?badge(r.alarm.alarm_type||'major'):'--')+'</td><td>'+(r.timestamp?new Date(r.timestamp).toLocaleString():'--')+'</td></tr>';
+  }).join('');
+}
+
+// === ALERTS ===
+async function loadAlerts(range){
+  range=range||document.getElementById('alert-range').getAttribute('data-range')||'24h';
+  document.getElementById('alert-range').setAttribute('data-range',range);
+  var d=await api('/api/v1/detection/reports?limit=50');
+  var st=await api('/api/v1/system/stats?time_range='+range);
+  if(!d||!d.data) return;
+  var reports=d.data||[];
+  var alerts=reports.filter(function(r){return r.alarm&&r.alarm.triggered;});
+  var alertHours={};
+  alerts.forEach(function(a){var h=new Date(a.timestamp).getHours()+':00';alertHours[h]=(alertHours[h]||0)+1;});
+  var sortedKeys=Object.keys(alertHours).sort();
+  if(sortedKeys.length){
+    setChart('alertTime',new Chart(document.getElementById('alertTimeChart'),{type:'bar',data:{labels:sortedKeys,datasets:[{label:'告警',data:sortedKeys.map(function(k){return alertHours[k];}),backgroundColor:'#ef4444'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}));
+  }
+  var freqMap={};
+  alerts.forEach(function(a){var t=a.alarm?a.alarm.alarm_type:'unknown';freqMap[t]=(freqMap[t]||0)+1;});
+  if(Object.keys(freqMap).length){
+    setChart('alertFreq',new Chart(document.getElementById('alertFreqChart'),{type:'polarArea',data:{labels:Object.keys(freqMap),datasets:[{data:Object.values(freqMap),backgroundColor:['#ef4444','#f97316','#eab308','#38bdf8','#94a3b8']}]},options:{responsive:true,maintainAspectRatio:false}}));
+  }
+  document.getElementById('alert-feed').innerHTML=alerts.length?alerts.map(function(r){
+    return '<div class=\"alert-item '+(r.alarm?r.alarm.alarm_type:'major')+'\"><strong>'+(r.alarm?(r.alarm.alarm_type||'ALERT').toUpperCase():'ALERT')+'</strong> | 设备: '+r.device_id+' | 缺陷: '+r.total_defects+' | 操作: '+(r.alarm?r.alarm.action:'N/A')+' | <span style=\"color:var(--text2)\">'+new Date(r.timestamp).toLocaleString()+'</span></div>';
+  }).join(''):'<p style=\"color:var(--green)\">暂无告警</p>';
+}
+
+// === MODEL ===
+async function loadModel(){
+  var d=await api('/api/v1/model/current');
+  var h=await api('/api/v1/model/history?limit=20');
+  if(d&&d.data){
+    var m=d.data;
+    document.getElementById('model-cards').innerHTML=
+      '<div class=\"card\"><h3>当前版本</h3><div class=\"value accent\">'+(m.model_id||'N/A')+'</div></div>'+
+      '<div class=\"card\"><h3>类型</h3><div class=\"value\" style=\"font-size:20px\">'+(m.model_type||'N/A')+'</div></div>'+
+      '<div class=\"card\"><h3>准确率</h3><div class=\"value green\">'+(m.accuracy?((m.accuracy*100).toFixed(1)+'%'):'N/A')+'</div></div>';
+  }
+  if(h&&h.data){
+    document.getElementById('model-history').innerHTML=h.data.map(function(m){
+      return '<tr><td>'+m.model_id+'</td><td>'+m.model_type+'</td><td>'+(m.accuracy?((m.accuracy*100).toFixed(1)+'%'):'--')+'</td><td>'+(m.mAP50?((m.mAP50*100).toFixed(1)+'%'):'--')+'</td><td>'+badge(m.status==='active'?'minor':m.status)+' '+m.status+'</td><td>'+(m.release_date||'--')+'</td></tr>';
+    }).join('');
+  }
+}
+
+async function registerModel(){
+  var id=document.getElementById('newModelId').value||('v'+Date.now().toString(36));
+  var acc=parseFloat(document.getElementById('newModelAcc').value)||0.96;
+  var r=await fetch('/api/v1/model/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model_id:id,model_type:'yolov8_defect',model_url:'https://cdn.example.com/'+id+'.onnx',checksum:'sha256:auto',version_info:{release_date:new Date().toISOString().slice(0,10),accuracy:acc,improvements:['dashboard_registered']}})});
+  var d=await r.json();
+  document.getElementById('modelRegStatus').textContent=r.ok?'已注册: '+id:'注册失败';
+  if(r.ok) loadModel();
+}
+
+// === STORAGE ===
+async function uploadImage(){
+  var file=document.getElementById('uploadFile').files[0];
+  if(!file){document.getElementById('uploadStatus').textContent='请选择文件';return;}
+  var device=document.getElementById('uploadDevice').value||'CAM-001';
+  var form=new FormData();form.append('file',file);
+  document.getElementById('uploadStatus').textContent='上传中...';
+  var r=await fetch('/api/v1/storage/upload?device_id='+encodeURIComponent(device),{method:'POST',body:form});
+  var d=await r.json();
+  document.getElementById('uploadStatus').textContent=r.ok?'已上传: '+d.data.object_name:'上传失败';
+  loadStorageImages();
+}
+
+async function loadStorageImages(){
+  var d=await api('/api/v1/storage/list?limit=50');
+  var items=d&&d.data?d.data:[];
+  var listHtml='';
+  for(var j=0;j<items.length;j++){
+    listHtml+='<tr><td>'+items[j].name+'</td><td>'+(items[j].size/1024).toFixed(1)+' KB</td><td><a href=\"/api/v1/storage/download/'+items[j].name+'\" style=\"color:var(--accent)\" target=\"_blank\">下载</a> | <button data-name=\"'+items[j].name+'\" class=\"del-btn\" style=\"color:var(--red);background:none;border:none;cursor:pointer;font-size:13px\">删除</button></td></tr>';
+  }
+  document.getElementById('storage-list').innerHTML=items.length?listHtml:'<tr><td colspan=\"3\" style=\"color:var(--text2)\">暂无图像</td></tr>';
+  var delBtns=document.getElementById('storage-list').querySelectorAll('.del-btn');
+  for(var k=0;k<delBtns.length;k++){
+    delBtns[k].onclick=function(){deleteImage(this.getAttribute('data-name'));};
+  }
+}
+
+async function deleteImage(name){
+  await fetch('/api/v1/storage/'+encodeURIComponent(name),{method:'DELETE'});
+  loadStorageImages();
+}
+
+async function runInference(){
+  var device=document.getElementById('inferDevice').value||'CAM-001';
+  document.getElementById('inferStatus').textContent='推理中...';
+  var r=await fetch('/api/v1/detection/infer?device_id='+encodeURIComponent(device),{method:'POST'});
+  var d=await r.json();
+  document.getElementById('inferStatus').innerHTML=r.ok?'完成! 报告: '+d.data.report_id+'<br>检出: '+(d.data.total_defects||0)+' 个缺陷':'推理失败';
+}
+
+// === HEALTH ===
+async function checkHealth(){
+  var d=await api('/api/v1/system/health');
+  var ok=d&&d.code===0;
+  document.getElementById('health').innerHTML='<span class=\"status-dot '+(ok?'online':'offline')+'\"></span>'+(ok?'系统在线':'离线');
+}
+
+// === WEBSOCKET ===
+var ws=null;
+function connectWS(){
+  var proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(proto+'://'+location.host+'/ws/alerts');
+  ws.onopen=function(){console.log('WS connected');};
+  ws.onmessage=function(e){
+    try{var msg=JSON.parse(e.data);
+      if(msg.type==='alert'){
+        var a=msg.data;
+        var feed=document.getElementById('alert-feed');
+        var item=document.createElement('div');
+        item.className='alert-item '+(a.severity||'major');
+        item.innerHTML='<strong>'+(a.type||'ALERT').toUpperCase()+'</strong> | 设备: '+a.device_id+' | 置信度: '+(a.confidence||0).toFixed(2)+' | <span style=\"color:var(--text2)\">'+new Date().toLocaleTimeString()+'</span>';
+        if(feed.children[0]&&feed.children[0].tagName==='P') feed.innerHTML='';
+        feed.insertBefore(item,feed.firstChild);
+        if(feed.children.length>20) feed.removeChild(feed.lastChild);
+      }
+    }catch(ex){}
+  };
+  ws.onclose=function(){setTimeout(connectWS,3000);};
+  ws.onerror=function(){ws.close();};
+}
+connectWS();
+setInterval(function(){if(ws&&ws.readyState===WebSocket.OPEN) ws.send('ping');},30000);
+
+// === MAIN LOOP ===
+async function refreshAll(){
+  await checkHealth();
+  await loadOverview();
+  var active=document.querySelector('.panel.active');
+  if(active&&active.id==='panel-detection') await loadDetection();
+  if(active&&active.id==='panel-alerts') await loadAlerts();
+  document.getElementById('last-update').textContent=new Date().toLocaleTimeString();
+}
+function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleString();}
+
+refreshAll();updateClock();
+setInterval(refreshAll,5000);setInterval(updateClock,1000);
+</script>
+</body>
+</html>
