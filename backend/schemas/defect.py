@@ -38,7 +38,7 @@ class DefectType(str, Enum):
     DENSE_SECTION = "dense_section"  # DS-01 稀密档
     SURFACE_MARK = "surface_mark"  # SM-01 磨痕
     WEAVE_DEFECT = "weave_defect"  # WD-01 死皱
-    OTHER = "other"  # OT-01 其他（防御性兜底）
+    OTHER = "other"  # OT-01 其他 (防御性兜底)
 
 
 class Severity(str, Enum):
@@ -85,10 +85,26 @@ TIANCHI_CLASS_NAMES: List[str] = [
 
 # Primary Chinese label per class (parallel to TIANCHI_CLASS_NAMES).
 TIANCHI_CLASS_NAMES_ZH: List[str] = [
-    "破洞", "污渍", "三丝", "结头", "花板跳",
-    "百脚", "毛粒", "粗经", "松经", "断经",
-    "吊经", "粗纬", "纬缩", "浆斑", "整经结",
-    "星跳", "断氨纶", "稀密档", "磨痕", "死皱",
+    "破洞",
+    "污渍",
+    "三丝",
+    "结头",
+    "花板跳",
+    "百脚",
+    "毛粒",
+    "粗经",
+    "松经",
+    "断经",
+    "吊经",
+    "粗纬",
+    "纬缩",
+    "浆斑",
+    "整经结",
+    "星跳",
+    "断氨纶",
+    "稀密档",
+    "磨痕",
+    "死皱",
 ]
 
 # DefectType -> DefectCode

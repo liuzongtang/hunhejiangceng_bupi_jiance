@@ -69,7 +69,9 @@ class DimensionRewardComputer:
         self.num_bins = num_bins
         # Critical class ids for the D06/D07 sensitivity dimensions.
         self.broken_class_ids = (
-            broken_class_ids if broken_class_ids is not None else TIANCHI_BROKEN_CLASS_IDS
+            broken_class_ids
+            if broken_class_ids is not None
+            else TIANCHI_BROKEN_CLASS_IDS
         )
         self.skip_class_ids = (
             skip_class_ids if skip_class_ids is not None else TIANCHI_SKIP_CLASS_IDS

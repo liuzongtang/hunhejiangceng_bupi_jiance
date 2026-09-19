@@ -17,8 +17,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from pathlib import Path
+import sys
 from typing import Dict, List, Tuple
 
 # Allow `python scripts/predict_defect.py` to import the `backend` package
@@ -49,7 +49,10 @@ def make_item(
         "code": project_code(name),
         "confidence": round(float(conf), 4),
         "bbox_xyxy": [
-            round(float(x1), 1), round(float(y1), 1), round(float(x2), 1), round(float(y2), 1),
+            round(float(x1), 1),
+            round(float(y1), 1),
+            round(float(x2), 1),
+            round(float(y2), 1),
         ],
     }
 
@@ -103,12 +106,16 @@ def main() -> int:
         if use_onnx:
             img = cv2.imread(path)
             d = engine.predict([img])[0]
-            for c, s, b in zip(d["classes"], d["scores"], d["boxes"]):
+            for c, s, b in zip(d["classes"], d["scores"], d["boxes"], strict=False):
                 items.append(make_item(int(c), float(s), tuple(b)))
         else:
-            r = model.predict(source=path, imgsz=args.imgsz, conf=args.conf, verbose=False)[0]
+            r = model.predict(
+                source=path, imgsz=args.imgsz, conf=args.conf, verbose=False
+            )[0]
             if r.boxes is not None and len(r.boxes) > 0:
-                for c, s, b in zip(r.boxes.cls, r.boxes.conf, r.boxes.xyxy):
+                for c, s, b in zip(
+                    r.boxes.cls, r.boxes.conf, r.boxes.xyxy, strict=False
+                ):
                     items.append(make_item(int(c), float(s), tuple(b.cpu().numpy())))
         detections[name] = items
 

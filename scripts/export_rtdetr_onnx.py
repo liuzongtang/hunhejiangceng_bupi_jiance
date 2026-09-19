@@ -14,8 +14,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
+import sys
 
 # Allow `python scripts/export_rtdetr_onnx.py` to run without an editable install.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -36,12 +36,16 @@ def main() -> int:
     model = YOLO(args.weights)
     simplify = not args.no_simplify
     try:
-        path = model.export(format="onnx", imgsz=args.imgsz, opset=args.opset, simplify=simplify)
+        path = model.export(
+            format="onnx", imgsz=args.imgsz, opset=args.opset, simplify=simplify
+        )
     except Exception as e:
         # RT-DETR's deformable-attention graph can break onnxsim; fall back.
         if simplify:
             print(f"[warn] simplify=True failed ({e}); retrying simplify=False")
-            path = model.export(format="onnx", imgsz=args.imgsz, opset=args.opset, simplify=False)
+            path = model.export(
+                format="onnx", imgsz=args.imgsz, opset=args.opset, simplify=False
+            )
         else:
             raise
     print(f"Exported ONNX to: {path}")

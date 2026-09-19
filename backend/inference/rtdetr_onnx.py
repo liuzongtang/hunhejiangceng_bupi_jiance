@@ -134,7 +134,8 @@ class RTDETRONNXEngine:
         scores = scores[keep].astype(np.float32)
         classes = labels[keep]
         class_names = [
-            self.class_names[c] if c < len(self.class_names) else str(c) for c in classes
+            self.class_names[c] if c < len(self.class_names) else str(c)
+            for c in classes
         ]
 
         return {

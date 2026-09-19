@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import argparse
 import os
-import sys
 from pathlib import Path
+import sys
 
 # Allow `python scripts/train_rtdetr.py` to import the `backend` package.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -38,10 +38,21 @@ def main() -> int:
     parser.add_argument("--epochs", type=int, default=60, help="Epochs to train")
     parser.add_argument("--imgsz", type=int, default=1280, help="Input resolution")
     parser.add_argument("--batch", type=int, default=8, help="Batch size")
-    parser.add_argument("--lr0", type=float, default=0.0005, help="Initial learning rate")
-    parser.add_argument("--mosaic", type=float, default=0.0, help="Mosaic aug prob (RT-DETR: 0)")
-    parser.add_argument("--patience", type=int, default=20, help="Early-stop patience (epochs)")
-    parser.add_argument("--save-period", type=int, default=5, help="Save last.pt every N epochs (resume safety)")
+    parser.add_argument(
+        "--lr0", type=float, default=0.0005, help="Initial learning rate"
+    )
+    parser.add_argument(
+        "--mosaic", type=float, default=0.0, help="Mosaic aug prob (RT-DETR: 0)"
+    )
+    parser.add_argument(
+        "--patience", type=int, default=20, help="Early-stop patience (epochs)"
+    )
+    parser.add_argument(
+        "--save-period",
+        type=int,
+        default=5,
+        help="Save last.pt every N epochs (resume safety)",
+    )
     parser.add_argument("--device", default="0", help="cuda device index")
     parser.add_argument("--workers", type=int, default=0, help="DataLoader workers")
     parser.add_argument("--project", default="runs/rtdetr", help="Output project dir")

@@ -55,9 +55,7 @@ def main() -> int:
     )
 
     # 2. Build dataloaders (collate_fn handles variable-length boxes).
-    train_loader, val_loader, _ = create_dataloaders(
-        config, batch_size=args.batch_size
-    )
+    train_loader, val_loader, _ = create_dataloaders(config, batch_size=args.batch_size)
 
     # 3. Build the model and trainer.
     model = SimpleDefectDetector(

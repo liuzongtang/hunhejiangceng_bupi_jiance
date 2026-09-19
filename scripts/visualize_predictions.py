@@ -15,13 +15,12 @@ from __future__ import annotations
 
 import argparse
 import os
-import sys
 from pathlib import Path
+import sys
 from typing import List, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from backend.inference.class_mapping import (
@@ -32,10 +31,10 @@ from backend.inference.class_mapping import (
 
 SEVERITY_COLORS = {
     "critical": (220, 38, 38),  # red
-    "major": (234, 88, 12),     # orange
-    "medium": (202, 138, 4),    # amber
-    "minor": (37, 99, 235),     # blue
-    "info": (107, 114, 128),    # gray
+    "major": (234, 88, 12),  # orange
+    "medium": (202, 138, 4),  # amber
+    "minor": (37, 99, 235),  # blue
+    "info": (107, 114, 128),  # gray
 }
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff"}
@@ -70,7 +69,9 @@ def _get_backend(weights: str, imgsz: int, conf: float):
     return ("pt", YOLO(weights))
 
 
-def _detect(backend, image_path: str, imgsz: int, conf: float) -> List[Tuple[int, float, Tuple]]:
+def _detect(
+    backend, image_path: str, imgsz: int, conf: float
+) -> List[Tuple[int, float, Tuple]]:
     """Return detections as [(class_id, score, (x1, y1, x2, y2)), ...]."""
     kind, model = backend
     if kind == "onnx":
@@ -78,21 +79,25 @@ def _detect(backend, image_path: str, imgsz: int, conf: float) -> List[Tuple[int
 
         img = cv2.imread(image_path)
         d = model.predict([img])[0]
-        return [(int(c), float(s), tuple(b)) for c, s, b in zip(d["classes"], d["scores"], d["boxes"])]
+        return [
+            (int(c), float(s), tuple(b))
+            for c, s, b in zip(d["classes"], d["scores"], d["boxes"], strict=False)
+        ]
 
     r = model.predict(source=image_path, imgsz=imgsz, conf=conf, verbose=False)[0]
     out: List[Tuple[int, float, Tuple]] = []
     if r.boxes is not None and len(r.boxes) > 0:
-        for c, s, b in zip(r.boxes.cls, r.boxes.conf, r.boxes.xyxy):
+        for c, s, b in zip(r.boxes.cls, r.boxes.conf, r.boxes.xyxy, strict=False):
             out.append((int(c), float(s), tuple(b.cpu().numpy())))
     return out
 
 
-def _annotate(image_path: str, detections: List[Tuple], font: ImageFont.FreeTypeFont) -> Image.Image:
+def _annotate(
+    image_path: str, detections: List[Tuple], font: ImageFont.FreeTypeFont
+) -> Image.Image:
     img = Image.open(image_path).convert("RGB")
     draw = ImageDraw.Draw(img)
     lw = max(3, int(img.width * 0.004))
-    text_h = max(20, int(img.width * 0.028))
 
     for cid, score, xyxy in detections:
         x1, y1, x2, y2 = (int(v) for v in xyxy)
@@ -136,7 +141,9 @@ def main() -> int:
     parser.add_argument("--images", default="data/tianchi/test/images")
     parser.add_argument("--imgsz", type=int, default=1280)
     parser.add_argument("--conf", type=float, default=0.25)
-    parser.add_argument("--limit", type=int, default=12, help="Number of images to annotate")
+    parser.add_argument(
+        "--limit", type=int, default=12, help="Number of images to annotate"
+    )
     parser.add_argument("--ncols", type=int, default=4, help="Mosaic columns")
     parser.add_argument("--cell", type=int, default=640, help="Mosaic cell size (px)")
     parser.add_argument("--out", default="", help="Output dir")

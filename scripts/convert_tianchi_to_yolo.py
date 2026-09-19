@@ -27,12 +27,12 @@ Usage:
 from __future__ import annotations
 
 import argparse
+from collections import defaultdict
 import json
 import os
 import random
 import shutil
-from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from PIL import Image
 
@@ -43,7 +43,9 @@ from PIL import Image
 # Chinese defect_name -> category id (1..20), per the dataset README.
 NAME_TO_CATEGORY: Dict[str, int] = {
     "破洞": 1,
-    "水渍": 2, "油渍": 2, "污渍": 2,
+    "水渍": 2,
+    "油渍": 2,
+    "污渍": 2,
     "三丝": 3,
     "结头": 4,
     "花板跳": 5,
@@ -53,16 +55,28 @@ NAME_TO_CATEGORY: Dict[str, int] = {
     "松经": 9,
     "断经": 10,
     "吊经": 11,
-    "粗纬": 12, "粗维": 12,  # 粗纬 (coarse weft); 粗维 is the README's typo
+    "粗纬": 12,
+    "粗维": 12,  # 粗纬 (coarse weft); 粗维 is the README's typo
     "纬缩": 13,
     "浆斑": 14,
     "整经结": 15,
-    "星跳": 16, "跳花": 16,
+    "星跳": 16,
+    "跳花": 16,
     "断氨纶": 17,
-    "稀密档": 18, "浪纹档": 18, "色差档": 18,
-    "磨痕": 19, "轧痕": 19, "修痕": 19, "烧毛痕": 19,
-    "死皱": 20, "云织": 20, "双纬": 20, "双经": 20,
-    "跳纱": 20, "筘路": 20, "纬纱不良": 20,
+    "稀密档": 18,
+    "浪纹档": 18,
+    "色差档": 18,
+    "磨痕": 19,
+    "轧痕": 19,
+    "修痕": 19,
+    "烧毛痕": 19,
+    "死皱": 20,
+    "云织": 20,
+    "双纬": 20,
+    "双经": 20,
+    "跳纱": 20,
+    "筘路": 20,
+    "纬纱不良": 20,
 }
 
 # category id (1..20) -> english class name
@@ -117,7 +131,9 @@ def load_annotations(anno_path: str) -> Dict[str, List[Dict]]:
     return by_name
 
 
-def xyxy_to_yolo(bbox: List[float], w: int, h: int) -> Tuple[float, float, float, float]:
+def xyxy_to_yolo(
+    bbox: List[float], w: int, h: int
+) -> Tuple[float, float, float, float]:
     """Convert xyxy pixel bbox to normalized (cx, cy, bw, bh)."""
     xmin, ymin, xmax, ymax = (float(v) for v in bbox)
     cx = (xmin + xmax) / 2.0 / w
@@ -192,7 +208,9 @@ def convert_train_dir(
             count += 1
 
     if skipped:
-        print(f"  [warn] {skipped} annotations had unknown defect_name and were skipped")
+        print(
+            f"  [warn] {skipped} annotations had unknown defect_name and were skipped"
+        )
     return count
 
 
@@ -260,15 +278,25 @@ def write_meta(root: str, scheme: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--train-dirs", nargs="+", default=[], help="Extracted train dataset dirs")
-    parser.add_argument("--test-dirs", nargs="+", default=[], help="Extracted test dirs (no labels)")
+    parser.add_argument(
+        "--train-dirs", nargs="+", default=[], help="Extracted train dataset dirs"
+    )
+    parser.add_argument(
+        "--test-dirs", nargs="+", default=[], help="Extracted test dirs (no labels)"
+    )
     parser.add_argument("--out", default="data/tianchi", help="Output root directory")
     parser.add_argument(
-        "--class-scheme", default="tianchi20", choices=["tianchi20"],
+        "--class-scheme",
+        default="tianchi20",
+        choices=["tianchi20"],
         help="Class scheme to emit (default: tianchi20, 20 classes)",
     )
-    parser.add_argument("--val-ratio", type=float, default=0.1, help="Validation split ratio")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed for val split")
+    parser.add_argument(
+        "--val-ratio", type=float, default=0.1, help="Validation split ratio"
+    )
+    parser.add_argument(
+        "--seed", type=int, default=42, help="Random seed for val split"
+    )
     args = parser.parse_args()
 
     scheme = args.class_scheme

@@ -14,9 +14,9 @@ from __future__ import annotations
 from backend.schemas.defect import (
     DEFECT_CODES,
     DEFECT_SEVERITY,
-    DefectType,
     TIANCHI_CLASS_NAMES,
     TIANCHI_CLASS_NAMES_ZH,
+    DefectType,
 )
 
 __all__ = [

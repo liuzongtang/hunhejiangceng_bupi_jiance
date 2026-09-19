@@ -85,9 +85,7 @@ class TrainingVisualizer:
         self.history["scalar_reward"].append(scalar)
 
         # Per-dimension
-        for i, name in enumerate(
-            ["loc", "cls", "cal", "miss", "fp", "broken", "skip"]
-        ):
+        for i, name in enumerate(["loc", "cls", "cal", "miss", "fp", "broken", "skip"]):
             dim_name = (
                 self.dimension_names[i] if i < len(self.dimension_names) else name
             )

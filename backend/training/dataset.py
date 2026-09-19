@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 # 磨痕/轧痕/修痕/烧毛痕=19, 死皱/云织/双纬/双经/跳纱/筘路/纬纱不良=20.
 
 # Critical class ids for the sensitivity dimensions D06/D07 (see dimension_rewards.py).
-TIANCHI_BROKEN_CLASS_IDS = {9, 16}   # broken_warp, broken_spandex
-TIANCHI_SKIP_CLASS_IDS = {15, 19}    # star_skip, weave_defect(跳纱)
+TIANCHI_BROKEN_CLASS_IDS = {9, 16}  # broken_warp, broken_spandex
+TIANCHI_SKIP_CLASS_IDS = {15, 19}  # star_skip, weave_defect(跳纱)
 
 
 @dataclass

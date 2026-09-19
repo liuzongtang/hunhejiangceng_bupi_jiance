@@ -20,8 +20,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from pathlib import Path
+import sys
 from typing import Dict, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -31,7 +31,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
-
 
 # ---------------------------------------------------------------------------
 # Data loading
@@ -56,7 +55,9 @@ def _run_val(weights_pt: str, data_yaml: str, imgsz: int) -> Optional[Dict]:
         from ultralytics import YOLO
 
         model = YOLO(weights_pt)
-        res = model.val(data=data_yaml, imgsz=imgsz, split="val", plots=False, verbose=False)
+        res = model.val(
+            data=data_yaml, imgsz=imgsz, split="val", plots=False, verbose=False
+        )
         box = res.box
         names = list(model.names.values()) if model.names else []
 
@@ -71,7 +72,9 @@ def _run_val(weights_pt: str, data_yaml: str, imgsz: int) -> Optional[Dict]:
         return {
             "map50": float(box.map50),
             "map": float(box.map),
-            "map75": float(getattr(box, "map75", None)) if hasattr(box, "map75") else None,
+            "map75": float(getattr(box, "map75", None))
+            if hasattr(box, "map75")
+            else None,
             "precision": float(box.mp),
             "recall": float(box.mr),
             "per_class_ap50": per_class,
@@ -103,14 +106,34 @@ def _plot_curves(df: pd.DataFrame, out_png: str) -> None:
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
     fig.suptitle("RT-DETR Tianchi-20 training curves", fontsize=14, fontweight="bold")
 
-    _line(axes[0, 0], df, ["train/giou_loss", "train/cls_loss", "train/l1_loss"],
-          "train loss", "Training losses")
-    _line(axes[0, 1], df, ["val/giou_loss", "val/cls_loss", "val/l1_loss"],
-          "val loss", "Validation losses")
-    _line(axes[0, 2], df, ["metrics/mAP50(B)", "metrics/mAP50-95(B)"],
-          "mAP", "Detection mAP")
-    _line(axes[1, 0], df, ["metrics/precision(B)", "metrics/recall(B)"],
-          "score", "Precision / Recall")
+    _line(
+        axes[0, 0],
+        df,
+        ["train/giou_loss", "train/cls_loss", "train/l1_loss"],
+        "train loss",
+        "Training losses",
+    )
+    _line(
+        axes[0, 1],
+        df,
+        ["val/giou_loss", "val/cls_loss", "val/l1_loss"],
+        "val loss",
+        "Validation losses",
+    )
+    _line(
+        axes[0, 2],
+        df,
+        ["metrics/mAP50(B)", "metrics/mAP50-95(B)"],
+        "mAP",
+        "Detection mAP",
+    )
+    _line(
+        axes[1, 0],
+        df,
+        ["metrics/precision(B)", "metrics/recall(B)"],
+        "score",
+        "Precision / Recall",
+    )
     _line(axes[1, 1], df, ["lr/pg0"], "learning rate", "Learning rate")
 
     # Summary text panel
@@ -170,7 +193,9 @@ def main() -> int:
     parser.add_argument("--run", default="runs/rtdetr/tianchi20", help="Run directory")
     parser.add_argument("--data", default="data/tianchi/data.yaml", help="Dataset yaml")
     parser.add_argument("--imgsz", type=int, default=1280)
-    parser.add_argument("--no-val", action="store_true", help="Skip the validation pass")
+    parser.add_argument(
+        "--no-val", action="store_true", help="Skip the validation pass"
+    )
     parser.add_argument("--out", default="", help="Output dir (default <run>/analysis)")
     args = parser.parse_args()
 
@@ -187,7 +212,10 @@ def main() -> int:
         weights_pt = os.path.join(run_dir, "weights", "best.pt")
         val_metrics = _run_val(weights_pt, args.data, args.imgsz)
         if val_metrics:
-            _plot_per_class(val_metrics["per_class_ap50"], os.path.join(out_dir, "per_class_map.png"))
+            _plot_per_class(
+                val_metrics["per_class_ap50"],
+                os.path.join(out_dir, "per_class_map.png"),
+            )
 
     summary: Dict = {}
     if df is not None:
@@ -203,7 +231,9 @@ def main() -> int:
         summary["val"] = {k: v for k, v in val_metrics.items() if k != "per_class_ap50"}
         summary["per_class_ap50"] = val_metrics["per_class_ap50"]
 
-    with open(os.path.join(out_dir, "metrics_summary.json"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(out_dir, "metrics_summary.json"), "w", encoding="utf-8"
+    ) as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
     print(f"  saved {os.path.join(out_dir, 'metrics_summary.json')}")
 

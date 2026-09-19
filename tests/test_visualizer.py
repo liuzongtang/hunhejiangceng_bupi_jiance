@@ -18,8 +18,8 @@ class TestMixedRewardVisualizer:
         with (
             patch("mixed_reward.visualizer._WANDB_AVAILABLE", True),
             patch("mixed_reward.visualizer._TENSORBOARD_AVAILABLE", True),
-            patch("mixed_reward.visualizer.wandb"),
-            patch("mixed_reward.visualizer.SummaryWriter"),
+            patch("mixed_reward.visualizer.wandb") as mock_wandb,
+            patch("mixed_reward.visualizer.SummaryWriter") as mock_tb,
         ):
             from mixed_reward.visualizer import MixedRewardVisualizer
 

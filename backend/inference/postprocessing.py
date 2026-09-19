@@ -12,7 +12,12 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from backend.schemas.defect import DEFECT_CODES, DEFECT_SEVERITY, TIANCHI_CLASS_NAMES, DefectType
+from backend.schemas.defect import (
+    DEFECT_CODES,
+    DEFECT_SEVERITY,
+    TIANCHI_CLASS_NAMES,
+    DefectType,
+)
 
 
 class DetectionPostprocessor:
