@@ -23,6 +23,18 @@ runs/
 *.db
 *.sqlite
 
+# Dataset archives (large, not for git)
+*.zip
+shujuji/
+
+# Model weights / checkpoints (large binaries)
+*.pt
+*.onnx
+*.pth
+
+# Log files
+*.log
+
 # Deployment artifacts
 deploy/
 

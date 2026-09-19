@@ -90,9 +90,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 const canvas=document.getElementById('fabricCanvas');
 const ctx=canvas.getContext('2d');
 let running=false,timer=null,imgCount=0,defCount=0,defTypes={};
-const DEFECTS=['broken_yarn','hole','stain','missing_stitch','color_diff','skip_stitch','thin_yarn'];
-const DEFECT_NAMES={broken_yarn:'断纱',hole:'破洞',stain:'污渍',missing_stitch:'漏针',color_diff:'色差',skip_stitch:'跳针',thin_yarn:'细节'};
+const DEFECTS=['hole','stain','three_silk','knot','flower_board','hundred_feet','hair_particle','coarse_warp','loose_warp','broken_warp','hanging_warp','coarse_weft','weft_shrink','size_stain','warping_knot','star_skip','broken_spandex','dense_section','surface_mark','weave_defect'];
+const DEFECT_NAMES={hole:'破洞',stain:'污渍',three_silk:'三丝',knot:'结头',flower_board:'花板跳',hundred_feet:'百脚',hair_particle:'毛粒',coarse_warp:'粗经',loose_warp:'松经',broken_warp:'断经',hanging_warp:'吊经',coarse_weft:'粗纬',weft_shrink:'纬缩',size_stain:'浆斑',warping_knot:'整经结',star_skip:'星跳',broken_spandex:'断氨纶',dense_section:'稀密档',surface_mark:'磨痕',weave_defect:'死皱'};
 const SEV_NAMES={critical:'严重',major:'主要',medium:'中等',minor:'轻微'};
+const SEV_BY_TYPE={hole:'critical',stain:'medium',three_silk:'minor',knot:'minor',flower_board:'major',hundred_feet:'major',hair_particle:'minor',coarse_warp:'minor',loose_warp:'minor',broken_warp:'critical',hanging_warp:'major',coarse_weft:'minor',weft_shrink:'minor',size_stain:'medium',warping_knot:'minor',star_skip:'major',broken_spandex:'critical',dense_section:'major',surface_mark:'minor',weave_defect:'major'};
 
 function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
 function hsl(h,s,l){return `hsl(${h},${s}%,${l}%)`;}
@@ -122,7 +123,7 @@ function drawFabric(withDefect){
 function drawDefect(type){
   const x=rand(80,500),y=rand(60,380);
   ctx.save();
-  if(type==='broken_yarn'){
+  if(type==='broken_warp'||type==='broken_spandex'){
     ctx.strokeStyle='#1a1a2e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);
     for(let i=1;i<rand(30,100);i++){ctx.lineTo(Math.min(630,Math.max(10,x+rand(-3,4)*i)),Math.min(470,Math.max(10,y+rand(-2,3)*i)));}
     ctx.stroke();
@@ -130,21 +131,21 @@ function drawDefect(type){
     const r=rand(10,30);const grad=ctx.createRadialGradient(x,y,0,x,y,r);
     grad.addColorStop(0,'#0a0a0f');grad.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=grad;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
-  }else if(type==='stain'){
+  }else if(type==='stain'||type==='size_stain'){
     const r=rand(15,35);ctx.fillStyle='rgba(80,50,20,.25)';ctx.beginPath();
     for(let i=0;i<12;i++){const a=i/12*Math.PI*2;const dr=r+rand(-8,8);ctx.lineTo(x+Math.cos(a)*dr,y+Math.sin(a)*dr);}
     ctx.closePath();ctx.fill();
-  }else if(type==='missing_stitch'){
+  }else if(type==='star_skip'||type==='weave_defect'){
     ctx.fillStyle='#d0d0d8';ctx.fillRect(x,y,rand(30,70),rand(3,6));
-  }else if(type==='color_diff'){
-    ctx.fillStyle='rgba(30,0,0,.15)';ctx.beginPath();ctx.arc(x,y,rand(25,50),0,Math.PI*2);ctx.fill();
+  }else{
+    ctx.fillStyle='rgba(40,20,0,.18)';ctx.beginPath();ctx.arc(x,y,rand(12,28),0,Math.PI*2);ctx.fill();
   }
   ctx.restore();
 
   // Show bounding box overlay
   const stage=document.getElementById('stage');
   const box=document.createElement('div');
-  const sev=['critical','major','medium','minor'][rand(0,3)];
+  const sev=SEV_BY_TYPE[type]||'minor';
   box.className=`defect-box ${sev}`;
   box.style.left=(x-rand(10,30))+'px';
   box.style.top=(y-rand(10,25))+'px';

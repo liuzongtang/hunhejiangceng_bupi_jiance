@@ -191,7 +191,7 @@ async function loadOverview(){
   setChart('trend',new Chart(document.getElementById('trendChart'),{type:'line',data:{labels:trend.labels,datasets:[{label:'缺陷/小时',data:trend.data,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,.1)',fill:true,tension:.3}]},options:{responsive:true,maintainAspectRatio:false}}));
   var types=sd.by_type||{};
   if(Object.keys(types).length){
-    setChart('type',new Chart(document.getElementById('typeChart'),{type:'bar',data:{labels:Object.keys(types),datasets:[{label:'数量',data:Object.values(types),backgroundColor:['#ef4444','#f97316','#eab308','#22c55e','#38bdf8','#8b5cf6','#ec4899','#14b8a6']}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}));
+    setChart('type',new Chart(document.getElementById('typeChart'),{type:'bar',data:{labels:Object.keys(types),datasets:[{label:'数量',data:Object.values(types),backgroundColor:['#ef4444','#f97316','#eab308','#84cc16','#22c55e','#10b981','#14b8a6','#06b6d4','#0ea5e9','#3b82f6','#6366f1','#8b5cf6','#a855f7','#d946ef','#ec4899','#f43f5e','#f59e0b','#facc15','#a3e635','#38bdf8']}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}));
   }
   var sevs=sd.by_severity||{};
   if(Object.keys(sevs).length){
@@ -212,11 +212,11 @@ async function loadDetection(range){
   setChart('detTrend',new Chart(document.getElementById('detTrendChart'),{type:'line',data:{labels:trend.labels,datasets:[{label:'缺陷',data:trend.data,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.1)',fill:true,tension:.3}]},options:{responsive:true,maintainAspectRatio:false}}));
   var typesList=[];
   reports.forEach(function(r){if(r.by_type) Object.keys(r.by_type).forEach(function(t){if(typesList.indexOf(t)<0) typesList.push(t);});});
-  typesList=typesList.slice(0,8);
+  typesList=typesList.slice(0,20);
   var labels=sd.trend?sd.trend.labels.slice(-12):[];
   if(typesList.length&&labels.length){
     var matrix=typesList.map(function(t){return labels.map(function(){return 0;});});
-    setChart('heatmap',new Chart(document.getElementById('heatmapChart'),{type:'bar',data:{labels:labels,datasets:typesList.map(function(t,i){return {label:t,data:matrix[i],backgroundColor:['#ef4444','#f97316','#eab308','#22c55e','#38bdf8','#8b5cf6','#ec4899','#14b8a6'][i]||'#94a3b8'};})},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true}}}}));
+    setChart('heatmap',new Chart(document.getElementById('heatmapChart'),{type:'bar',data:{labels:labels,datasets:typesList.map(function(t,i){return {label:t,data:matrix[i],backgroundColor:['#ef4444','#f97316','#eab308','#84cc16','#22c55e','#10b981','#14b8a6','#06b6d4','#0ea5e9','#3b82f6','#6366f1','#8b5cf6','#a855f7','#d946ef','#ec4899','#f43f5e','#f59e0b','#facc15','#a3e635','#38bdf8'][i]||'#94a3b8'};})},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true}}}}));
   }
   document.getElementById('report-list').innerHTML=reports.slice(0,20).map(function(r){
     return '<tr><td>'+r.report_id+'</td><td>'+r.device_id+'</td><td>'+r.total_defects+'</td><td>'+(r.by_type?Object.entries(r.by_type).map(function(e){return e[0]+':'+e[1];}).join(', '):'--')+'</td><td>'+(r.alarm&&r.alarm.triggered?badge(r.alarm.alarm_type||'major'):'--')+'</td><td>'+(r.timestamp?new Date(r.timestamp).toLocaleString():'--')+'</td></tr>';

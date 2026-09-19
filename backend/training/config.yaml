@@ -8,6 +8,7 @@ training:
   weight_decay: 0.0001
   scheduler: cosine
   warmup_epochs: 5
+  num_classes: 20  # Tianchi smartdiagnosisofclothflaw 20 defect categories
 
   # Hybrid reward parameters
   hybrid_reward:
@@ -40,5 +41,5 @@ targets:
   dim_loc: 0.9
   dim_cls: 0.95
   dim_broken: 0.95
-  dim_stitch: 0.90
+  dim_skip: 0.90
   consistency_loss: 0.0

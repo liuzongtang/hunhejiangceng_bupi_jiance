@@ -41,7 +41,7 @@ class TrainingVisualizer:
             "miss",
             "fp",
             "broken",
-            "stitch",
+            "skip",
         ]
         self.external = external_visualizer
 
@@ -80,13 +80,13 @@ class TrainingVisualizer:
         # Scalar reward = sum of all dimension rewards
         scalar = sum(
             train_metrics.get(f"dim_{name}", 0)
-            for name in ["loc", "cls", "cal", "miss", "fp", "broken", "stitch"]
+            for name in ["loc", "cls", "cal", "miss", "fp", "broken", "skip"]
         )
         self.history["scalar_reward"].append(scalar)
 
         # Per-dimension
         for i, name in enumerate(
-            ["loc", "cls", "cal", "miss", "fp", "broken", "stitch"]
+            ["loc", "cls", "cal", "miss", "fp", "broken", "skip"]
         ):
             dim_name = (
                 self.dimension_names[i] if i < len(self.dimension_names) else name
@@ -207,7 +207,7 @@ class TrainingVisualizer:
         dims = " ".join(
             f"{name}={train_metrics.get(f'dim_{n}', 0):+.2f}"
             for n, name in zip(
-                ["loc", "cls", "cal", "miss", "fp", "broken", "stitch"],
+                ["loc", "cls", "cal", "miss", "fp", "broken", "skip"],
                 self.dimension_names,
                 strict=False,
             )

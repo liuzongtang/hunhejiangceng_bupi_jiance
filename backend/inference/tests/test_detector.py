@@ -77,7 +77,10 @@ class TestFabricDefectDetector:
             assert bbox[3] > 0  # height > 0
             assert det["severity"] in ("critical", "major", "medium", "minor", "info")
             assert det["type_code"].startswith(
-                ("BY", "MS", "HO", "ST", "CD", "TH", "WR", "OT")
+                (
+                    "HO", "ST", "SL", "KN", "FL", "HF", "HP", "CW", "LW",
+                    "BW", "HW", "CF", "WS", "SK", "BS", "DS", "SM", "WD",
+                )
             )
             assert "-" in det["type_code"]
 

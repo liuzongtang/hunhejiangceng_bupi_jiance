@@ -1,10 +1,11 @@
 """
 Inference engine backends for fabric defect detection.
 
-Supports three backends:
+Supports four backends:
   - ONNXInferenceEngine: ONNX Runtime (production, TensorRT compatible)
   - PyTorchInferenceEngine: Native PyTorch (development / debugging)
   - DummyInferenceEngine: Simulated detections (testing without model)
+  - RTDETRONNXEngine: dedicated RT-DETR parser (see backend.inference.rtdetr_onnx)
 """
 
 from __future__ import annotations
@@ -15,6 +16,8 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+
+from backend.schemas.defect import TIANCHI_CLASS_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -98,17 +101,7 @@ class DummyInferenceEngine(InferenceEngine):
     Returns a random number of detections per image with plausible values.
     """
 
-    DEFECT_CLASSES = [
-        "broken_yarn",
-        "missing_stitch",
-        "skip_stitch",
-        "hole",
-        "stain",
-        "color_diff",
-        "thick_yarn",
-        "thin_yarn",
-        "crease",
-    ]
+    DEFECT_CLASSES = list(TIANCHI_CLASS_NAMES)
 
     def __init__(self, seed: int = 42, **kwargs):
         kwargs.pop("model_path", None)  # Dummy doesn't use model_path
@@ -368,13 +361,16 @@ def create_engine(
     Factory: create an inference engine by backend name.
 
     Args:
-        backend: "dummy" | "onnx" | "pytorch"
+        backend: "dummy" | "onnx" | "pytorch" | "rtdetr"
         model_path: Path to model file (not needed for dummy).
         **kwargs: Passed to engine constructor.
 
     Returns:
-        Configured InferenceEngine instance.
+        Configured engine instance.
     """
+    if backend == "rtdetr":
+        return _create_rtdetr_engine(model_path, **kwargs)
+
     engines = {
         "dummy": DummyInferenceEngine,
         "onnx": ONNXInferenceEngine,
@@ -388,4 +384,21 @@ def create_engine(
     if backend != "dummy":
         engine.load()
         engine.warmup()
+    return engine
+
+
+def _create_rtdetr_engine(model_path: str, **kwargs) -> "RTDETRONNXEngine":
+    """Build and load an RT-DETR ONNX engine from ``create_engine`` kwargs."""
+    from backend.inference.rtdetr_onnx import RTDETRONNXEngine
+
+    input_size = kwargs.get("input_size", (1280, 1280))
+    imgsz = input_size[0] if isinstance(input_size, (tuple, list)) else input_size
+    engine = RTDETRONNXEngine(
+        model_path=model_path,
+        imgsz=imgsz,
+        conf_threshold=kwargs.get("confidence_threshold", 0.25),
+        class_names=TIANCHI_CLASS_NAMES,
+    )
+    engine.load()
+    engine.warmup()
     return engine

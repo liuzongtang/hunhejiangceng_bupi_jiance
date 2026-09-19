@@ -72,12 +72,12 @@ class TestPostprocessing:
                 ),
                 "scores": np.array([0.9, 0.3], dtype=np.float32),  # 0.3 below threshold
                 "classes": np.array([0, 1], dtype=np.int64),
-                "class_names": ["broken_yarn", "missing_stitch"],
+                "class_names": ["broken_warp", "stain"],
             }
         ]
         results = pp.process(raw)
         assert len(results[0]) == 1
-        assert results[0][0]["type"] == "broken_yarn"
+        assert results[0][0]["type"] == "broken_warp"
 
     def test_empty_detections(self, pp):
         """Empty raw output should return empty list."""
@@ -99,29 +99,40 @@ class TestPostprocessing:
                 "boxes": np.array([[100, 200, 80, 60]], dtype=np.float32),
                 "scores": np.array([0.95], dtype=np.float32),
                 "classes": np.array([0], dtype=np.int64),
-                "class_names": ["broken_yarn"],
+                "class_names": ["broken_warp"],
             }
         ]
         results = pp.process(raw)
         det = results[0][0]
         for key in ["defect_id", "type", "type_code", "severity", "bbox", "confidence"]:
             assert key in det, f"Missing key: {key}"
-        assert det["type_code"] == "BY-01"
+        assert det["type_code"] == "BW-01"
         assert det["severity"] == "critical"
         assert det["confidence"] == pytest.approx(0.95, abs=0.01)
 
     def test_defect_code_mapping(self, pp):
-        """All 9 defect types should map correctly."""
+        """All 20 defect types should map correctly."""
         expected = {
-            "broken_yarn": "BY-01",
-            "missing_stitch": "MS-01",
-            "skip_stitch": "MS-02",
             "hole": "HO-01",
             "stain": "ST-01",
-            "color_diff": "CD-01",
-            "thick_yarn": "TH-01",
-            "thin_yarn": "TH-02",
-            "crease": "WR-01",
+            "three_silk": "SL-01",
+            "knot": "KN-01",
+            "flower_board": "FL-01",
+            "hundred_feet": "HF-01",
+            "hair_particle": "HP-01",
+            "coarse_warp": "CW-01",
+            "loose_warp": "LW-01",
+            "broken_warp": "BW-01",
+            "hanging_warp": "HW-01",
+            "coarse_weft": "CF-01",
+            "weft_shrink": "WS-01",
+            "size_stain": "ST-02",
+            "warping_knot": "KN-02",
+            "star_skip": "SK-01",
+            "broken_spandex": "BS-01",
+            "dense_section": "DS-01",
+            "surface_mark": "SM-01",
+            "weave_defect": "WD-01",
         }
         for name, code in expected.items():
             assert pp._defect_code(name) == code

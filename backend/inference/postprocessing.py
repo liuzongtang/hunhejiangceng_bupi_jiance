@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from backend.schemas.defect import DEFECT_CODES, DefectType
+from backend.schemas.defect import DEFECT_CODES, DEFECT_SEVERITY, TIANCHI_CLASS_NAMES, DefectType
 
 
 class DetectionPostprocessor:
@@ -20,27 +20,19 @@ class DetectionPostprocessor:
     Postprocesses raw model outputs into structured detection results.
     """
 
-    DEFECT_CLASSES = [
-        "broken_yarn",  # 0
-        "missing_stitch",  # 1
-        "skip_stitch",  # 2
-        "hole",  # 3
-        "stain",  # 4
-        "color_diff",  # 5
-        "thick_yarn",  # 6
-        "thin_yarn",  # 7
-        "crease",  # 8
-    ]
+    DEFECT_CLASSES = list(TIANCHI_CLASS_NAMES)
 
     def __init__(
         self,
         confidence_threshold: float = 0.5,
         nms_threshold: float = 0.45,
         max_detections: int = 100,
+        input_size: int = 640,
     ):
         self.confidence_threshold = confidence_threshold
         self.nms_threshold = nms_threshold
         self.max_detections = max_detections
+        self.input_size = input_size
 
     def process(
         self,
@@ -175,13 +167,15 @@ class DetectionPostprocessor:
     ) -> List[Dict]:
         """Scale bboxes from model input size back to original image size."""
         oh, ow = original_size
+        scale_x = ow / self.input_size
+        scale_y = oh / self.input_size
         for det in detections:
             bbox = det["bbox"]
             det["bbox"] = [
-                round(bbox[0] * ow / 640, 1),
-                round(bbox[1] * oh / 640, 1),
-                round(bbox[2] * ow / 640, 1),
-                round(bbox[3] * oh / 640, 1),
+                round(bbox[0] * scale_x, 1),
+                round(bbox[1] * scale_y, 1),
+                round(bbox[2] * scale_x, 1),
+                round(bbox[3] * scale_y, 1),
             ]
         return detections
 
@@ -204,16 +198,8 @@ class DetectionPostprocessor:
 
     @staticmethod
     def _severity(type_name: str) -> str:
-        """Determine severity from defect type."""
-        severity_map = {
-            "broken_yarn": "critical",
-            "missing_stitch": "critical",
-            "hole": "critical",
-            "skip_stitch": "major",
-            "stain": "medium",
-            "color_diff": "medium",
-            "thick_yarn": "minor",
-            "thin_yarn": "minor",
-            "crease": "minor",
-        }
-        return severity_map.get(type_name, "info")
+        """Determine severity from defect type via the canonical severity map."""
+        try:
+            return DEFECT_SEVERITY[DefectType(type_name)].value
+        except (ValueError, KeyError):
+            return "info"

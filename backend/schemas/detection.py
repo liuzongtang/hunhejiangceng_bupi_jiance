@@ -108,7 +108,7 @@ class DefectItem(BaseModel):
     """Single detected defect."""
 
     defect_id: str = Field(..., description="Unique defect identifier")
-    type: str = Field(..., description="Defect type name, e.g. broken_yarn")
+    type: str = Field(..., description="Defect type name, e.g. broken_warp")
     type_code: str = Field(..., description="Standard defect code, e.g. BY-01")
     severity: str = Field(
         ..., description="Severity: critical / major / medium / minor"

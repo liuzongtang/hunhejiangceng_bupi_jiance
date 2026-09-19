@@ -55,6 +55,8 @@ class ModelConfig:
     current_version: str = "v1.0.0"
     model_type: str = "yolov8_defect"
     model_path: str = "./models/yolov8_defect_v1.0.0.onnx"
+    backend: str = "dummy"  # dummy / onnx / pytorch / rtdetr
+    input_size: int = 640
     confidence_threshold: float = 0.5
     nms_iou_threshold: float = 0.45
     device: str = "cuda"  # cuda / cpu / tensorrt
@@ -62,12 +64,11 @@ class ModelConfig:
 
 @dataclass
 class AlertConfig:
-    """Alert and alarm settings."""
+    """Alert and alarm settings (severity-driven actions)."""
 
-    broken_yarn_action: str = "immediate_stop"
-    missing_stitch_action: str = "immediate_stop"
     critical_severity_action: str = "stop_machine"
     major_severity_action: str = "mark_roll"
+    medium_severity_action: str = "log_only"
     minor_severity_action: str = "log_only"
     mqtt_broker: str = "localhost"
     mqtt_port: int = 1883

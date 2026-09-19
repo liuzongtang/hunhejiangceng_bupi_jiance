@@ -67,7 +67,7 @@ print("\n--- Module 3: Pydantic Schemas ---")
 from datetime import datetime, timezone
 
 from backend.schemas.api import DetectionReportRequest
-from backend.schemas.defect import DEFECT_CODES, DefectType
+from backend.schemas.defect import DEFECT_CODES, TIANCHI_CLASS_NAMES, DefectType
 
 req = DetectionReportRequest(
     device_id="CAM-001",
@@ -77,7 +77,7 @@ req = DetectionReportRequest(
         "total_defects": 1,
         "defect_list": [
             {
-                "type": "broken_yarn",
+                "type": "broken_warp",
                 "bbox": [1, 2, 3, 4],
                 "confidence": 0.9,
                 "severity": "critical",
@@ -86,8 +86,8 @@ req = DetectionReportRequest(
     },
 )
 test("DetectionReportRequest", lambda: req.device_id)
-test("10 defect types", lambda: len(DefectType))
-test("BY-01 mapping", lambda: DEFECT_CODES[DefectType.BROKEN_YARN].value)
+test("20 defect classes", lambda: len(TIANCHI_CLASS_NAMES))
+test("BW-01 mapping", lambda: DEFECT_CODES[DefectType.BROKEN_WARP].value)
 
 # 4. Services
 print("\n--- Module 4: Alert Service ---")
@@ -95,10 +95,10 @@ from backend.services.alert_service import AlertService
 
 svc = AlertService()
 a = svc.evaluate_defect(
-    "broken_yarn", "critical", "CAM-001", "B01", [0, 0, 10, 10], 0.96
+    "broken_warp", "critical", "CAM-001", "B01", [0, 0, 10, 10], 0.96
 )
 test("Critical -> stop_machine", lambda: a.recommended_action == "stop_machine")
-b = svc.evaluate_defect("thin_yarn", "minor", "CAM", "B", [0, 0, 1, 1], 0.5)
+b = svc.evaluate_defect("surface_mark", "minor", "CAM", "B", [0, 0, 1, 1], 0.5)
 test("Minor -> no alert", lambda: b is None)
 
 # 5. Inference Engine
@@ -209,7 +209,7 @@ with TestClient(app) as client:
                 "total_defects": 1,
                 "defect_list": [
                     {
-                        "type": "broken_yarn",
+                        "type": "broken_warp",
                         "bbox": [100, 200, 50, 60],
                         "confidence": 0.97,
                         "severity": "critical",

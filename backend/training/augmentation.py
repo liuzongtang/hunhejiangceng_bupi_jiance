@@ -123,7 +123,11 @@ class DefectAugmentation:
         mosaic[:, cy:, :cx] = c[:, H - cy :, :cx]  # bottom-left
         mosaic[:, cy:, cx:] = d[:, H - cy :, W - cx :]  # bottom-right
 
-        return mosaic.unsqueeze(0)
+        # Put the mosaic back at index 0 and keep the full batch (previously
+        # this collapsed the batch to a single image via unsqueeze(0)).
+        out = images.clone()
+        out[0] = mosaic
+        return out
 
     def _apply_mixup(
         self,

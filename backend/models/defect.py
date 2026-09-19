@@ -28,6 +28,11 @@ from backend.schemas.defect import DEFECT_CODES, DefectType, Severity
 DEFECT_CODE_MAP = {k: v.value for k, v in DEFECT_CODES.items()}
 
 
+def _enum_values(enum_cls):
+    """Return an enum's string values so SAEnum persists values, not member names."""
+    return [member.value for member in enum_cls]
+
+
 class DefectRecord(Base):
     """
     Individual defect detection record.
@@ -39,9 +44,13 @@ class DefectRecord(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     defect_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    type: Mapped[DefectType] = mapped_column(SAEnum(DefectType), nullable=False)
+    type: Mapped[DefectType] = mapped_column(
+        SAEnum(DefectType, values_callable=_enum_values), nullable=False
+    )
     type_code: Mapped[str] = mapped_column(String(10), nullable=False)
-    severity: Mapped[Severity] = mapped_column(SAEnum(Severity), nullable=False)
+    severity: Mapped[Severity] = mapped_column(
+        SAEnum(Severity, values_callable=_enum_values), nullable=False
+    )
 
     # Bounding box: [x, y, width, height]
     bbox: Mapped[dict] = mapped_column(JSON, nullable=False)
@@ -100,9 +109,13 @@ class Annotation(Base):
     image_width: Mapped[int] = mapped_column(Integer, nullable=False)
     image_height: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    defect_type: Mapped[DefectType] = mapped_column(SAEnum(DefectType), nullable=False)
+    defect_type: Mapped[DefectType] = mapped_column(
+        SAEnum(DefectType, values_callable=_enum_values), nullable=False
+    )
     defect_code: Mapped[str] = mapped_column(String(10), nullable=False)
-    severity: Mapped[Severity] = mapped_column(SAEnum(Severity), nullable=False)
+    severity: Mapped[Severity] = mapped_column(
+        SAEnum(Severity, values_callable=_enum_values), nullable=False
+    )
 
     # BBox: stored as JSON {x_min, y_min, x_max, y_max}
     bbox: Mapped[dict] = mapped_column(JSON, nullable=False)

@@ -27,7 +27,7 @@ async def submit_detection_report(
 
     Accepts detection results including defect list, bounding boxes,
     confidence scores, and severity levels. Triggers alarms for
-    critical defects (broken_yarn, missing_stitch, hole).
+    critical defects (hole, broken_warp, broken_spandex).
 
     Returns a report_id for tracking.
     """

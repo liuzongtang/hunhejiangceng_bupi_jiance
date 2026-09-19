@@ -38,6 +38,7 @@ from backend.training.loss_functions import (
     total_loss,
 )
 from backend.training.metrics import TrainingMetrics
+from backend.training.model import SimpleDefectDetector
 from backend.training.visualizer import TrainingVisualizer
 
 __all__ = [
@@ -48,6 +49,7 @@ __all__ = [
     "DimensionRewardComputer",
     "FabricDataset",
     "HybridRewardTrainer",
+    "SimpleDefectDetector",
     "TrainingMetrics",
     "TrainingVisualizer",
     "auto_discover_dataset",

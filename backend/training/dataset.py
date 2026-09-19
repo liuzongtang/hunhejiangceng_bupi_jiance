@@ -20,7 +20,20 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset, random_split
 
+from backend.schemas.defect import TIANCHI_CLASS_NAMES
+
 logger = logging.getLogger(__name__)
+
+# Tianchi "smartdiagnosisofclothflaw" 20 defect categories (id 0..19).
+# The canonical names (and their order) live in backend.schemas.defect; the
+# README maps category ids 1..20 to: 破洞=1, 水渍/油渍/污渍=2, 三丝=3, 结头=4,
+# 花板跳=5, 百脚=6, 毛粒=7, 粗经=8, 松经=9, 断经=10, 吊经=11, 粗纬=12, 纬缩=13,
+# 浆斑=14, 整经结=15, 星跳/跳花=16, 断氨纶=17, 稀密档/浪纹档/色差档=18,
+# 磨痕/轧痕/修痕/烧毛痕=19, 死皱/云织/双纬/双经/跳纱/筘路/纬纱不良=20.
+
+# Critical class ids for the sensitivity dimensions D06/D07 (see dimension_rewards.py).
+TIANCHI_BROKEN_CLASS_IDS = {9, 16}   # broken_warp, broken_spandex
+TIANCHI_SKIP_CLASS_IDS = {15, 19}    # star_skip, weave_defect(跳纱)
 
 
 @dataclass
@@ -43,26 +56,13 @@ class DatasetConfig:
 
     # Image settings
     image_size: Tuple[int, int] = (640, 640)
-    num_classes: int = 10
+    num_classes: int = len(TIANCHI_CLASS_NAMES)  # 20 Tianchi defect classes
 
     # Augmentation
     augment: bool = True
 
     # Class names
-    class_names: List[str] = field(
-        default_factory=lambda: [
-            "broken_yarn",
-            "missing_stitch",
-            "skip_stitch",
-            "hole",
-            "stain",
-            "color_diff",
-            "thick_yarn",
-            "thin_yarn",
-            "crease",
-            "other",
-        ]
-    )
+    class_names: List[str] = field(default_factory=lambda: list(TIANCHI_CLASS_NAMES))
 
 
 class FabricDataset(Dataset):
@@ -88,19 +88,12 @@ class FabricDataset(Dataset):
         self.annotation_file = annotation_file
         self.image_size = image_size
         self.format = format
-        self.class_names = class_names or [
-            "broken_yarn",
-            "missing_stitch",
-            "skip_stitch",
-            "hole",
-            "stain",
-            "color_diff",
-            "thick_yarn",
-            "thin_yarn",
-            "crease",
-            "other",
-        ]
+        self.class_names = class_names or list(TIANCHI_CLASS_NAMES)
         self.augment = augment
+
+        # Image file list (must exist before loading annotations, since the
+        # YOLO/COCO loaders iterate over it to match labels to images).
+        self._image_files = self._find_images()
 
         # Load annotations
         if format == "coco" and annotation_file:
@@ -109,9 +102,6 @@ class FabricDataset(Dataset):
             self._annotations = self._load_yolo()
         else:
             self._annotations = []
-
-        # Image file list
-        self._image_files = self._find_images()
 
     def __len__(self) -> int:
         return len(self._image_files)
@@ -234,11 +224,51 @@ class FabricDataset(Dataset):
         return annotations
 
 
+def defect_collate_fn(batch) -> Tuple[torch.Tensor, List[Dict]]:
+    """
+    Collate a batch of (image, target) samples for the single-box model.
+
+    The default DataLoader collate cannot stack variable-length box/label lists,
+    and `HybridRewardTrainer` expects `targets` as a ``List[Dict]`` (one entry
+    per image). This collator:
+
+      - stacks images into (B, 3, H, W);
+      - keeps the first (dominant) box/label of each image;
+      - drops negative (normal) images that have no defect box.
+
+    Returns:
+        (images, targets) where targets is a ``List[Dict]`` of
+        ``{"boxes": [[x, y, w, h]], "labels": [cls]}``.
+    """
+    images: List[torch.Tensor] = []
+    targets: List[Dict] = []
+    for img, target in batch:
+        boxes = target.get("boxes", [])
+        labels = target.get("labels", [])
+        if not boxes or not labels:
+            continue  # negative (normal) image — skip for this single-box model
+        images.append(img)
+        targets.append({"boxes": [list(boxes[0])], "labels": [int(labels[0])]})
+
+    if not images:
+        # Entire batch was negative: return an empty batch the trainer can skip.
+        return torch.empty(0, 3, 640, 640), []
+
+    return torch.stack(images), targets
+
+
 def create_dataloaders(
     config: DatasetConfig,
+    num_workers: int = 0,
+    batch_size: int = 16,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Create train/val/test DataLoaders from config.
+
+    Args:
+        config: DatasetConfig with paths/format/class settings.
+        num_workers: DataLoader worker count. Defaults to 0 (safest on Windows).
+        batch_size: Batch size for all loaders.
 
     Returns:
         (train_loader, val_loader, test_loader).
@@ -285,24 +315,27 @@ def create_dataloaders(
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=16,
+        batch_size=batch_size,
         shuffle=True,
-        num_workers=2,
+        num_workers=num_workers,
         pin_memory=True,
+        collate_fn=defect_collate_fn,
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=16,
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=2,
+        num_workers=num_workers,
         pin_memory=True,
+        collate_fn=defect_collate_fn,
     )
     test_loader = DataLoader(
         test_dataset or val_dataset,
-        batch_size=16,
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=2,
+        num_workers=num_workers,
         pin_memory=True,
+        collate_fn=defect_collate_fn,
     )
 
     return train_loader, val_loader, test_loader

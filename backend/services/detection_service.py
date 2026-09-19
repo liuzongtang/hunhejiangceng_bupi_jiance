@@ -12,10 +12,11 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models.defect import DefectRecord, DefectType, Severity
+from backend.models.defect import DefectRecord
 from backend.models.detection_report import DetectionReport
 from backend.models.device import Device
 from backend.schemas.api import DetectionReportRequest, DetectionReportResponseData
+from backend.schemas.defect import DEFECT_SEVERITY, DefectType, Severity
 
 
 class DetectionService:
@@ -56,14 +57,20 @@ class DetectionService:
             bbox = item.get("bbox", [0, 0, 0, 0])
             confidence = item.get("confidence", 0.0)
 
-            # Update aggregates
-            by_type[defect_type] = by_type.get(defect_type, 0) + 1
-            by_severity[severity] = by_severity.get(severity, 0) + 1
+            dt = self._resolve_type(defect_type)
+            # Canonical severity from the 20-class type wins; fall back to the
+            # client value for unknown types.
+            sev = DEFECT_SEVERITY.get(dt, self._resolve_severity(severity))
+            sev_value = sev.value
+
+            # Update aggregates (keyed by canonical type/severity values)
+            by_type[dt.value] = by_type.get(dt.value, 0) + 1
+            by_severity[sev_value] = by_severity.get(sev_value, 0) + 1
 
             # Check for critical defects that need alarm
-            if severity in ("critical", "major"):
+            if sev_value in ("critical", "major"):
                 alarm_triggered = True
-                if severity == "critical":
+                if sev_value == "critical":
                     alarm_type = "critical_defect"
                     alarm_action = "stop_machine"
                 elif alarm_type == "":
@@ -73,13 +80,9 @@ class DetectionService:
             # Create defect record
             record = DefectRecord(
                 defect_id=defect_id,
-                type=DefectType(defect_type)
-                if defect_type in DefectType.__members__
-                else DefectType.OTHER,
-                type_code=self._get_defect_code(defect_type),
-                severity=Severity(severity)
-                if severity in Severity.__members__
-                else Severity.INFO,
+                type=dt,
+                type_code=self._get_defect_code(dt.value),
+                severity=sev,
                 bbox={"x": bbox[0], "y": bbox[1], "w": bbox[2], "h": bbox[3]},
                 confidence=confidence,
                 device_id=request.device_id,
@@ -142,3 +145,25 @@ class DetectionService:
             return DEFECT_CODES[dt].value
         except (ValueError, KeyError):
             return "OT-01"
+
+    @staticmethod
+    def _resolve_type(name: str) -> DefectType:
+        """Resolve a type name (by value, then member name) to a DefectType."""
+        try:
+            return DefectType(name)
+        except ValueError:
+            try:
+                return DefectType[name]
+            except KeyError:
+                return DefectType.OTHER
+
+    @staticmethod
+    def _resolve_severity(name: str) -> Severity:
+        """Resolve a severity name (by value, then member name) to a Severity."""
+        try:
+            return Severity(name)
+        except ValueError:
+            try:
+                return Severity[name]
+            except KeyError:
+                return Severity.INFO

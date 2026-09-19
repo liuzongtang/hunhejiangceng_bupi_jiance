@@ -4,7 +4,7 @@ Training monitoring metrics (Section 5.5).
 Tracks:
   - train_loss, val_loss
   - scalar_reward (maximizing toward 1.0)
-  - Per-dimension rewards (loc, cls, cal, miss, fp, broken, stitch)
+  - Per-dimension rewards (loc, cls, cal, miss, fp, broken, skip)
   - consistency_loss (minimizing)
   - mAP@0.5, recall (target >= 0.95)
   - Per-class accuracy via confusion matrix
@@ -35,7 +35,7 @@ class TrainingMetrics:
             "dim_miss": [],
             "dim_fp": [],
             "dim_broken": [],
-            "dim_stitch": [],
+            "dim_skip": [],
             "learning_rate": [],
         }
         self.best_epoch: Dict[str, int] = {}

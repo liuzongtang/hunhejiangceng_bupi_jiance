@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Textile fabric defect detection system — FastAPI backend + PyTorch/ONNX inference + 7-dimension hybrid reward training. Supports 10 defect types with real-time WebSocket alerts and a Chinese-language dashboard.
+Textile fabric defect detection system — FastAPI backend + PyTorch/ONNX inference + 7-dimension hybrid reward training. Supports 20 defect types (Tianchi scheme) with real-time WebSocket alerts and a Chinese-language dashboard.
 
 ## Commands
 
@@ -69,16 +69,17 @@ Router (routers/*.py) → Service (services/*.py) → Model (models/*.py)
 
 ### Inference Engine (ABC + Factory)
 
-`backend/inference/engine.py` — `InferenceEngine` is an ABC defining `infer(images) → List[Dict]` and `load()`. Three implementations:
+`backend/inference/engine.py` — `InferenceEngine` is an ABC defining `infer(images) → List[Dict]` and `load()`. Four implementations:
 - `DummyInferenceEngine` — random detections for testing (no model needed)
 - `ONNXInferenceEngine` — ONNX Runtime for production
 - `PyTorchInferenceEngine` — native PyTorch for dev/debugging
+- `RTDETRONNXEngine` — RT-DETR ONNX model for the 20-class Tianchi detector
 
-Use `create_engine(backend="dummy|onnx|pytorch")` factory function. `backend/inference/detector.py` wraps the engine with preprocessing and postprocessing via `FabricDefectDetector` — use `get_detector()` singleton in API code.
+Use `create_engine(backend="dummy|onnx|pytorch|rtdetr")` factory function. `backend/inference/detector.py` wraps the engine with preprocessing and postprocessing via `FabricDefectDetector` — use `get_detector()` singleton in API code.
 
 ### Training (7-Dimension Hybrid Reward)
 
-`backend/training/hybrid_reward_trainer.py` — `HybridRewardTrainer` implements `L_total = L_detection + β·L_scalar + γ·L_consistency` across 7 dimensions (localization, classification, calibration, miss penalty, false-positive penalty, broken-yarn, missing-stitch). Dimension reward computation is in `backend/training/dimension_rewards.py`.
+`backend/training/hybrid_reward_trainer.py` — `HybridRewardTrainer` implements `L_total = L_detection + β·L_scalar + γ·L_consistency` across 7 dimensions (localization, classification, calibration, miss penalty, false-positive penalty, broken-yarn, skip/weave). Dimension reward computation is in `backend/training/dimension_rewards.py`.
 
 ### Mixed Reward (RLHF)
 

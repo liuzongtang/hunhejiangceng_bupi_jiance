@@ -23,7 +23,7 @@ class WebSocketManager:
     Usage:
         manager = WebSocketManager()
         await manager.connect(websocket, device_id="CAM-001")
-        await manager.broadcast_alert({"type": "broken_yarn", "severity": "critical"})
+        await manager.broadcast_alert({"type": "broken_warp", "severity": "critical"})
     """
 
     def __init__(self):

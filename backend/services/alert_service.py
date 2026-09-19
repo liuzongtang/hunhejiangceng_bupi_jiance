@@ -87,7 +87,7 @@ class AlertService:
         actions = {
             "critical": self.config.critical_severity_action,
             "major": self.config.major_severity_action,
-            "medium": self.config.minor_severity_action,
+            "medium": self.config.medium_severity_action,
             "minor": self.config.minor_severity_action,
         }
         return actions.get(severity, "log_only")

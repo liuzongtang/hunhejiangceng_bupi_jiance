@@ -67,13 +67,13 @@ def sample_detection_request():
             "total_defects": 2,
             "defect_list": [
                 {
-                    "type": "broken_yarn",
+                    "type": "broken_warp",
                     "bbox": [320, 450, 80, 120],
                     "confidence": 0.97,
                     "severity": "critical",
                 },
                 {
-                    "type": "missing_stitch",
+                    "type": "star_skip",
                     "bbox": [1250, 780, 45, 55],
                     "confidence": 0.89,
                     "severity": "major",

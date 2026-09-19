@@ -9,14 +9,17 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+from backend.inference.class_mapping import project_code, project_severity
 from backend.inference.engine import InferenceEngine, create_engine
 from backend.inference.postprocessing import DetectionPostprocessor
 from backend.inference.preprocessing import ImagePreprocessor
 from backend.schemas.api import DetectionReportRequest
+from backend.schemas.defect import TIANCHI_CLASS_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -40,17 +43,7 @@ class FabricDefectDetector:
         )
     """
 
-    DEFECT_CLASSES = [
-        "broken_yarn",
-        "missing_stitch",
-        "skip_stitch",
-        "hole",
-        "stain",
-        "color_diff",
-        "thick_yarn",
-        "thin_yarn",
-        "crease",
-    ]
+    DEFECT_CLASSES = list(TIANCHI_CLASS_NAMES)
 
     def __init__(
         self,
@@ -65,7 +58,7 @@ class FabricDefectDetector:
     ):
         """
         Args:
-            backend: "dummy" | "onnx" | "pytorch"
+            backend: "dummy" | "onnx" | "pytorch" | "rtdetr"
             model_path: Path to model file.
             input_size: Model input size (W, H).
             confidence_threshold: Minimum confidence for detections.
@@ -75,6 +68,11 @@ class FabricDefectDetector:
             seed: Random seed for dummy backend.
         """
         self.backend = backend
+
+        # RT-DETR is trained at 1280; default to that resolution unless the
+        # caller explicitly requested a different input_size.
+        if backend == "rtdetr" and input_size == (640, 640):
+            input_size = (1280, 1280)
         self.input_size = input_size
 
         # Create engine
@@ -88,7 +86,8 @@ class FabricDefectDetector:
             seed=seed,
         )
 
-        # Pre/post processors
+        # Pre/post processors (unused on the RT-DETR path, which preprocesses
+        # and parses inside the engine).
         self.preprocessor = ImagePreprocessor(
             input_size=input_size,
             normalize=normalize,
@@ -96,6 +95,7 @@ class FabricDefectDetector:
         self.postprocessor = DetectionPostprocessor(
             confidence_threshold=confidence_threshold,
             nms_threshold=nms_threshold,
+            input_size=input_size[0],
         )
 
         self._loaded = False
@@ -125,6 +125,9 @@ class FabricDefectDetector:
         if not images:
             return []
 
+        if self.backend == "rtdetr":
+            return self._detect_rtdetr(images)
+
         # Record original sizes for bbox scaling
         original_sizes = [(img.shape[0], img.shape[1]) for img in images]
 
@@ -144,6 +147,48 @@ class FabricDefectDetector:
             for det in det_list:
                 det["inference_time_ms"] = round(inference_time_ms / len(images), 1)
 
+        return detections
+
+    def _detect_rtdetr(self, images: List[np.ndarray]) -> List[List[Dict]]:
+        """
+        RT-DETR path: send raw images straight to the engine.
+
+        Skips the YOLO-style preprocessor (ImageNet letterbox) and
+        postprocessor (NMS + input-size scaling); ``RTDETRONNXEngine.predict``
+        performs its own scale-fill resize and returns xyxy boxes in original
+        pixels, which we convert to the report convention of xywh.
+        """
+        t0 = time.perf_counter()
+        raw = self.engine.predict(images)
+        inference_time_ms = (time.perf_counter() - t0) * 1000
+        per_image_ms = round(inference_time_ms / len(images), 1)
+
+        detections: List[List[Dict]] = []
+        for d in raw:
+            items: List[Dict] = []
+            boxes = d.get("boxes", np.zeros((0, 4), dtype=np.float32))
+            scores = d.get("scores", np.zeros(0, dtype=np.float32))
+            names = d.get("class_names", [])
+            for j in range(len(boxes)):
+                name = names[j] if names and j < len(names) else "other"
+                x1, y1, x2, y2 = (float(v) for v in boxes[j])
+                items.append(
+                    {
+                        "defect_id": f"D-{uuid.uuid4().hex[:8].upper()}",
+                        "type": name,
+                        "type_code": project_code(name),
+                        "severity": project_severity(name),
+                        "bbox": [
+                            round(x1, 1),
+                            round(y1, 1),
+                            round(x2 - x1, 1),
+                            round(y2 - y1, 1),
+                        ],
+                        "confidence": float(scores[j]),
+                        "inference_time_ms": per_image_ms,
+                    }
+                )
+            detections.append(items)
         return detections
 
     def detect_single(self, image: np.ndarray) -> List[Dict]:

@@ -9,15 +9,20 @@ Matches Section 5.2.1 of the project document:
   D04: Miss detection penalty          R_miss = -lam * miss_count   [-inf, 0]
   D05: False positive penalty          R_fp = -lam * fp_count       [-inf, 0]
   D06: Broken yarn sensitivity         R_broken = +1 detected / -2 missed
-  D07: Missing stitch sensitivity      R_stitch = +1 detected / -2 missed
+  D07: Skip/weave defect sensitivity   R_skip = +1 detected / -2 missed
 
-Dimension reward vector: R_dim = [R_loc, R_cls, R_cal, R_miss, R_fp, R_broken, R_stitch]
+Dimension reward vector: R_dim = [R_loc, R_cls, R_cal, R_miss, R_fp, R_broken, R_skip]
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional, Set
 
 import numpy as np
 import torch
+
+from backend.training.dataset import (
+    TIANCHI_BROKEN_CLASS_IDS,
+    TIANCHI_SKIP_CLASS_IDS,
+)
 
 # Dimension indices
 DIM_LOC = 0
@@ -26,7 +31,7 @@ DIM_CAL = 2
 DIM_MISS = 3
 DIM_FP = 4
 DIM_BROKEN = 5
-DIM_STITCH = 6
+DIM_SKIP = 6
 
 NUM_DIMENSIONS = 7
 
@@ -37,7 +42,7 @@ DIMENSION_NAMES = [
     "miss",  # D04
     "fp",  # D05
     "broken",  # D06
-    "stitch",  # D07
+    "skip",  # D07
 ]
 
 
@@ -55,11 +60,20 @@ class DimensionRewardComputer:
         lambda_fp: float = 1.0,
         iou_threshold: float = 0.5,
         num_bins: int = 10,
+        broken_class_ids: Optional[Set[int]] = None,
+        skip_class_ids: Optional[Set[int]] = None,
     ):
         self.lambda_miss = lambda_miss
         self.lambda_fp = lambda_fp
         self.iou_threshold = iou_threshold
         self.num_bins = num_bins
+        # Critical class ids for the D06/D07 sensitivity dimensions.
+        self.broken_class_ids = (
+            broken_class_ids if broken_class_ids is not None else TIANCHI_BROKEN_CLASS_IDS
+        )
+        self.skip_class_ids = (
+            skip_class_ids if skip_class_ids is not None else TIANCHI_SKIP_CLASS_IDS
+        )
 
     def compute_all(
         self,
@@ -96,8 +110,8 @@ class DimensionRewardComputer:
         # D06: Broken yarn sensitivity
         rewards["broken"] = self.compute_broken_reward(predictions, targets)
 
-        # D07: Missing stitch sensitivity
-        rewards["stitch"] = self.compute_stitch_reward(predictions, targets)
+        # D07: Skip/weave defect sensitivity
+        rewards["skip"] = self.compute_skip_reward(predictions, targets)
 
         return rewards
 
@@ -333,61 +347,76 @@ class DimensionRewardComputer:
         targets: List[Dict],
     ) -> torch.Tensor:
         """
-        R_broken = +1 if broken_yarn detected, -2 if missed.
+        R_broken = +1 if a broken-yarn defect detected, -2 if missed.
 
-        Heavy penalty for missing critical defects.
+        Heavy penalty for missing critical broken defects (e.g. broken_warp,
+        broken_spandex in the Tianchi 20-class scheme).
         """
         pred_classes = predictions.get("classes", [])
         p_classes_set = {
             p.item() if isinstance(p, torch.Tensor) else p for p in pred_classes
         }
 
-        # Check if any target contains broken_yarn
         has_broken = any(
-            "broken_yarn" in str(target.get("labels", []))
-            or 0 in target.get("labels", [])  # class 0 = broken_yarn
+            self._labels_contain(target.get("labels", []), self.broken_class_ids)
             for target in targets
         )
 
         if not has_broken:
             return torch.tensor(0.0)
 
-        # Check if prediction detected broken_yarn
-        detected = 0 in p_classes_set or "broken_yarn" in str(p_classes_set)
+        detected = bool(p_classes_set & self.broken_class_ids)
 
         return torch.tensor(1.0 if detected else -2.0)
 
     # ------------------------------------------------------------------
-    # D07: Missing Stitch Sensitivity
+    # D07: Skip / Weave Sensitivity
     # ------------------------------------------------------------------
 
-    def compute_stitch_reward(
+    def compute_skip_reward(
         self,
         predictions: Dict[str, torch.Tensor],
         targets: List[Dict],
     ) -> torch.Tensor:
         """
-        R_stitch = +1 if missing_stitch detected, -2 if missed.
+        R_skip = +1 if a skip/weave defect detected, -2 if missed.
 
-        Heavy penalty for missing critical defects.
+        Heavy penalty for missing critical skip defects (e.g. star_skip,
+        weave_defect/跳纱 in the Tianchi 20-class scheme).
         """
         pred_classes = predictions.get("classes", [])
         p_classes_set = {
             p.item() if isinstance(p, torch.Tensor) else p for p in pred_classes
         }
 
-        has_stitch = any(
-            "missing_stitch" in str(target.get("labels", []))
-            or 1 in target.get("labels", [])  # class 1 = missing_stitch
+        has_skip = any(
+            self._labels_contain(target.get("labels", []), self.skip_class_ids)
             for target in targets
         )
 
-        if not has_stitch:
+        if not has_skip:
             return torch.tensor(0.0)
 
-        detected = 1 in p_classes_set or "missing_stitch" in str(p_classes_set)
+        detected = bool(p_classes_set & self.skip_class_ids)
 
         return torch.tensor(1.0 if detected else -2.0)
+
+    # ------------------------------------------------------------------
+    # Label membership helper
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _labels_contain(labels: List, class_ids: Set[int]) -> bool:
+        """Return True if any label (int or string) matches the class-id set."""
+        for lbl in labels:
+            try:
+                if int(lbl) in class_ids:
+                    return True
+            except (TypeError, ValueError):
+                pass
+            if isinstance(lbl, str) and str(lbl) in class_ids:
+                return True
+        return False
 
     # ------------------------------------------------------------------
     # IoU Computation (bounding box)
@@ -427,6 +456,6 @@ class DimensionRewardComputer:
 
 def compute_reward_tensor(rewards: Dict[str, torch.Tensor]) -> torch.Tensor:
     """
-    Convert reward dict to tensor: [R_loc, R_cls, R_cal, R_miss, R_fp, R_broken, R_stitch].
+    Convert reward dict to tensor: [R_loc, R_cls, R_cal, R_miss, R_fp, R_broken, R_skip].
     """
     return torch.stack([rewards[name] for name in DIMENSION_NAMES])

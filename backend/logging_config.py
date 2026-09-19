@@ -89,7 +89,7 @@ class LogManager:
         log = LogManager(service="inference")
         log.critical("Critical defect detected!", data={
             "alert_id": "ALT-001",
-            "trigger_type": "broken_yarn",
+            "trigger_type": "broken_warp",
             "severity": "critical",
             "action_taken": "immediate_stop",
             "location": {"loom_id": "LOOM-007", "yarn_id": "WARP-023"},

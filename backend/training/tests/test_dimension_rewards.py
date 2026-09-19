@@ -17,7 +17,13 @@ class TestDimensionRewards:
 
     @pytest.fixture
     def computer(self):
-        return DimensionRewardComputer(lambda_miss=1.5, lambda_fp=1.0)
+        # Use class ids 0/1 in isolation to test the D06/D07 dimension logic.
+        return DimensionRewardComputer(
+            lambda_miss=1.5,
+            lambda_fp=1.0,
+            broken_class_ids={0},
+            skip_class_ids={1},
+        )
 
     @pytest.fixture
     def sample_predictions(self):
@@ -25,15 +31,15 @@ class TestDimensionRewards:
             "boxes": torch.tensor(
                 [[100, 200, 80, 60], [500, 300, 40, 40]], dtype=torch.float32
             ),
-            "classes": torch.tensor([0, 1]),  # 0=broken_yarn, 1=missing_stitch
+            "classes": torch.tensor([0, 1]),  # 0=broken, 1=skip
             "confidences": torch.tensor([0.95, 0.70]),
         }
 
     @pytest.fixture
     def sample_targets(self):
         return [
-            {"boxes": [[100, 200, 80, 60]], "labels": [0]},  # broken_yarn
-            {"boxes": [[500, 300, 40, 40]], "labels": [1]},  # missing_stitch
+            {"boxes": [[100, 200, 80, 60]], "labels": [0]},  # broken
+            {"boxes": [[500, 300, 40, 40]], "labels": [1]},  # skip
         ]
 
     # ----------------------------------------------------------------
@@ -111,7 +117,7 @@ class TestDimensionRewards:
     # ----------------------------------------------------------------
 
     def test_broken_detected(self, computer):
-        """Detecting broken_yarn should give +1.0."""
+        """Detecting a broken defect should give +1.0."""
         reward = computer.compute_broken_reward(
             {"classes": torch.tensor([0])},
             [{"labels": [0]}],
@@ -119,28 +125,34 @@ class TestDimensionRewards:
         assert reward.item() == 1.0
 
     def test_broken_missed(self, computer):
-        """Missing broken_yarn should give -2.0."""
+        """Missing a broken defect should give -2.0."""
         reward = computer.compute_broken_reward(
             {"classes": torch.tensor([1])},
             [{"labels": [0]}],
         )
         assert reward.item() == -2.0
 
-    def test_stitch_detected(self, computer):
-        """Detecting missing_stitch should give +1.0."""
-        reward = computer.compute_stitch_reward(
+    def test_skip_detected(self, computer):
+        """Detecting a skip defect should give +1.0."""
+        reward = computer.compute_skip_reward(
             {"classes": torch.tensor([1])},
             [{"labels": [1]}],
         )
         assert reward.item() == 1.0
 
-    def test_stitch_missed(self, computer):
-        """Missing missing_stitch should give -2.0."""
-        reward = computer.compute_stitch_reward(
+    def test_skip_missed(self, computer):
+        """Missing a skip defect should give -2.0."""
+        reward = computer.compute_skip_reward(
             {"classes": torch.tensor([0])},
             [{"labels": [1]}],
         )
         assert reward.item() == -2.0
+
+    def test_default_class_ids(self):
+        """Default D06/D07 ids should be the Tianchi broken/skip class sets."""
+        comp = DimensionRewardComputer()
+        assert comp.broken_class_ids == {9, 16}
+        assert comp.skip_class_ids == {15, 19}
 
     # ----------------------------------------------------------------
     # Full 7-dim vector

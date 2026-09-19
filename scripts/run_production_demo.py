@@ -53,11 +53,11 @@ def generate_fabric_image(
 
     if with_defect and rng.random() < 0.6:
         defect_type = rng.choice(
-            ["broken_yarn", "hole", "stain", "missing_stitch", "color_diff"]
+            ["broken_warp", "hole", "stain", "star_skip", "size_stain"]
         )
         x0, y0 = rng.randint(50, w - 150), rng.randint(50, h - 150)
 
-        if defect_type == "broken_yarn":
+        if defect_type == "broken_warp":
             # Thin dark line across the fabric
             for i in range(rng.randint(30, 120)):
                 dx, dy = rng.randint(-2, 3), rng.randint(-1, 2)
@@ -82,12 +82,12 @@ def generate_fabric_image(
                 np.uint8
             )
 
-        elif defect_type == "missing_stitch":
-            # Horizontal gap
+        elif defect_type == "star_skip":
+            # Horizontal gap (skipped weft)
             for dy in range(y0, min(y0 + rng.randint(3, 8), h)):
                 img[dy, x0 : x0 + rng.randint(30, 80)] = [180, 180, 190]
 
-        elif defect_type == "color_diff":
+        elif defect_type == "size_stain":
             # Subtle color shift in a region
             r = rng.randint(30, 60)
             yy_g, xx_g = np.ogrid[:h, :w]

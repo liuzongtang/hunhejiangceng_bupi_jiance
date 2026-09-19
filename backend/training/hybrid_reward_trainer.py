@@ -24,6 +24,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from backend.training.augmentation import build_augmentation
+from backend.training.dataset import TIANCHI_CLASS_NAMES
 from backend.training.dimension_rewards import (
     DIMENSION_NAMES,
     NUM_DIMENSIONS,
@@ -65,6 +66,8 @@ class HybridRewardTrainer:
         augmentation_config: Optional[dict] = None,
         # Device
         device: Optional[str] = None,
+        # Number of defect classes (logits width)
+        num_classes: int = len(TIANCHI_CLASS_NAMES),
     ):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
@@ -77,6 +80,7 @@ class HybridRewardTrainer:
         self.gamma = gamma
         self.alpha = alpha
         self.weight_update_freq = weight_update_freq
+        self.num_classes = num_classes
 
         # Learnable dimension weights (Section 5.2.2)
         self.dim_weights = nn.Parameter(torch.ones(NUM_DIMENSIONS) / NUM_DIMENSIONS)
@@ -184,6 +188,8 @@ class HybridRewardTrainer:
         epoch_start = time.time()
 
         for batch_idx, (images, targets) in enumerate(self.train_loader):
+            if images.numel() == 0:
+                continue  # empty batch (all negative images filtered out)
             step_result = self.train_step(images, targets)
 
             # Accumulate
@@ -200,7 +206,7 @@ class HybridRewardTrainer:
                     f"\r  Epoch {self.current_epoch:4d} | {pct:5.1f}% | "
                     f"Loss: {step_result['total_loss']:.4f} | "
                     f"Dim: [{step_result['dim_loc']:.2f}, {step_result['dim_cls']:.2f}, "
-                    f"{step_result['dim_broken']:.2f}, {step_result['dim_stitch']:.2f}]",
+                    f"{step_result['dim_broken']:.2f}, {step_result['dim_skip']:.2f}]",
                     end="",
                     file=sys.stderr,
                 )
@@ -234,6 +240,8 @@ class HybridRewardTrainer:
         n_batches = len(self.val_loader)
 
         for images, targets in self.val_loader:
+            if images.numel() == 0:
+                continue  # empty batch (all negative images filtered out)
             images = images.to(self.device)
             predictions = self.model(images)
             predictions = self._normalize_predictions(predictions)
@@ -316,7 +324,7 @@ class HybridRewardTrainer:
                 f"Loc: {train_avg['dim_loc']:.2f} | "
                 f"Cls: {train_avg['dim_cls']:.2f} | "
                 f"Broken: {train_avg['dim_broken']:.2f} | "
-                f"Stitch: {train_avg['dim_stitch']:.2f} | "
+                f"Skip: {train_avg['dim_skip']:.2f} | "
                 f"Time: {train_avg['time']:.1f}s",
                 file=sys.stderr,
             )
@@ -414,7 +422,9 @@ class HybridRewardTrainer:
         for key in ["logits", "boxes", "classes", "confidences"]:
             if key not in predictions:
                 if key == "logits":
-                    predictions[key] = torch.zeros(1, 10, device=self.device)
+                    predictions[key] = torch.zeros(
+                        1, self.num_classes, device=self.device
+                    )
                 elif key == "boxes":
                     predictions[key] = torch.zeros(0, 4, device=self.device)
                 elif key == "classes":

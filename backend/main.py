@@ -52,14 +52,29 @@ Backend API for computer-vision-based fabric inspection on production lines.
 - **Model Management**: Register and deploy model updates
 - **System Monitoring**: Device status, model versions, resource metrics
 
-### Defect Types (Section 4.1)
+### Defect Types (20 Tianchi classes)
 | Code  | Name          | Severity |
 |-------|---------------|----------|
-| BY-01 | Broken Yarn   | Critical |
-| MS-01 | Missing Stitch| Critical |
 | HO-01 | Hole          | Critical |
 | ST-01 | Stain         | Medium   |
-| CD-01 | Color Diff    | Medium   |
+| SL-01 | Three Silk    | Minor    |
+| KN-01 | Knot          | Minor    |
+| FL-01 | Flower Board  | Major    |
+| HF-01 | Hundred Feet  | Major    |
+| HP-01 | Hair Particle | Minor    |
+| CW-01 | Coarse Warp   | Minor    |
+| LW-01 | Loose Warp    | Minor    |
+| BW-01 | Broken Warp   | Critical |
+| HW-01 | Hanging Warp  | Major    |
+| CF-01 | Coarse Weft   | Minor    |
+| WS-01 | Weft Shrink   | Minor    |
+| ST-02 | Size Stain    | Medium   |
+| KN-02 | Warping Knot  | Minor    |
+| SK-01 | Star Skip     | Major    |
+| BS-01 | Broken Spandex| Critical |
+| DS-01 | Dense Section | Major    |
+| SM-01 | Surface Mark  | Minor    |
+| WD-01 | Weave Defect  | Major    |
 """,
         version="1.0.0",
         docs_url="/docs",
