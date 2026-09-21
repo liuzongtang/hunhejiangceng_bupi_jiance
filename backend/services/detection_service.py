@@ -16,7 +16,12 @@ from backend.models.defect import DefectRecord
 from backend.models.detection_report import DetectionReport
 from backend.models.device import Device
 from backend.schemas.api import DetectionReportRequest, DetectionReportResponseData
-from backend.schemas.defect import DEFECT_SEVERITY, DefectType, Severity
+from backend.schemas.defect import (
+    DEFECT_SEVERITY,
+    DefectType,
+    Severity,
+    effective_alert_severity,
+)
 
 
 class DetectionService:
@@ -63,16 +68,29 @@ class DetectionService:
             sev = DEFECT_SEVERITY.get(dt, self._resolve_severity(severity))
             sev_value = sev.value
 
+            # Alert severity escalates visually-confusable lookalikes (e.g.
+            # surface_mark ~ broken_warp) so a critical defect mislabelled as a
+            # minor lookalike still raises an alarm. The stored severity stays
+            # canonical; the escalation is recorded separately for auditability.
+            alert_sev = effective_alert_severity(dt)
+            alert_sev_value = alert_sev.value
+            escalated_severity = alert_sev if alert_sev is not sev else None
+
             # Update aggregates (keyed by canonical type/severity values)
             by_type[dt.value] = by_type.get(dt.value, 0) + 1
             by_severity[sev_value] = by_severity.get(sev_value, 0) + 1
 
-            # Check for critical defects that need alarm
-            if sev_value in ("critical", "major"):
+            # Check for critical defects that need alarm (on the alert severity)
+            if alert_sev_value in ("critical", "major"):
                 alarm_triggered = True
-                if sev_value == "critical":
-                    alarm_type = "critical_defect"
+                if alert_sev_value == "critical":
                     alarm_action = "stop_machine"
+                    if alarm_type != "critical_defect":
+                        alarm_type = (
+                            "suspected_critical"
+                            if escalated_severity
+                            else "critical_defect"
+                        )
                 elif alarm_type == "":
                     alarm_type = "major_defect"
                     alarm_action = "mark_roll"
@@ -83,6 +101,7 @@ class DetectionService:
                 type=dt,
                 type_code=self._get_defect_code(dt.value),
                 severity=sev,
+                escalated_severity=escalated_severity,
                 bbox={"x": bbox[0], "y": bbox[1], "w": bbox[2], "h": bbox[3]},
                 confidence=confidence,
                 device_id=request.device_id,

@@ -164,6 +164,40 @@ CRITICAL_DEFECTS: Set[DefectType] = {
     DefectType.BROKEN_SPANDEX,
 }
 
+# Predicted class -> visually-confusable higher-impact classes. From the val
+# confusion matrix (bidirectional, user-confirmed "长得一样"), a detection of the
+# key class may actually be one of these lookalikes. Alerting therefore escalates
+# to the higher severity so a critical defect mislabelled as a minor lookalike is
+# not silently downgraded (e.g. surface_mark ~ broken_warp). The *stored* severity
+# stays DEFECT_SEVERITY; this drives alerting only.
+CONFUSABLE_HIGHER_IMPACT: Dict[DefectType, List[DefectType]] = {
+    DefectType.SURFACE_MARK: [DefectType.BROKEN_WARP, DefectType.WEAVE_DEFECT],
+}
+
+_SEVERITY_RANK: Dict[Severity, int] = {
+    Severity.INFO: 0,
+    Severity.MINOR: 1,
+    Severity.MEDIUM: 2,
+    Severity.MAJOR: 3,
+    Severity.CRITICAL: 4,
+}
+
+
+def effective_alert_severity(defect_type: DefectType) -> Severity:
+    """Return the severity to use for alerting, escalating lookalike classes.
+
+    Returns the maximum severity among the predicted class and the higher-impact
+    classes it is visually confusable with, so alerting is driven by the
+    worst-case impact rather than the (uncertain) predicted label.
+    """
+    sev = DEFECT_SEVERITY.get(defect_type, Severity.INFO)
+    for higher in CONFUSABLE_HIGHER_IMPACT.get(defect_type, []):
+        h_sev = DEFECT_SEVERITY.get(higher, Severity.INFO)
+        if _SEVERITY_RANK[h_sev] > _SEVERITY_RANK[sev]:
+            sev = h_sev
+    return sev
+
+
 # Defect descriptions (Chinese).
 DEFECT_DESCRIPTIONS: Dict[DefectCode, str] = {
     DefectCode.HO_01: "破洞 — 织物破损穿孔",

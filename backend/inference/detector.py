@@ -14,7 +14,11 @@ import uuid
 
 import numpy as np
 
-from backend.inference.class_mapping import project_code, project_severity
+from backend.inference.class_mapping import (
+    project_alert_severity,
+    project_code,
+    project_severity,
+)
 from backend.inference.engine import InferenceEngine, create_engine
 from backend.inference.postprocessing import DetectionPostprocessor
 from backend.inference.preprocessing import ImagePreprocessor
@@ -228,20 +232,24 @@ class FabricDefectDetector:
 
         for det_list in detections_list:
             for det in det_list:
+                # Alert severity escalates lookalike classes (surface_mark ~
+                # broken_warp) so critical defects aren't silently downgraded.
+                alert_sev = project_alert_severity(det["type"])
                 all_defects.append(
                     {
                         "type": det["type"],
                         "bbox": det["bbox"],
                         "confidence": det["confidence"],
                         "severity": det["severity"],
+                        "alert_severity": alert_sev,
                     }
                 )
                 by_type[det["type"]] = by_type.get(det["type"], 0) + 1
                 by_severity[det["severity"]] = by_severity.get(det["severity"], 0) + 1
 
-                if det["severity"] in ("critical", "major"):
+                if alert_sev in ("critical", "major"):
                     alarm_triggered = True
-                    if det["severity"] == "critical":
+                    if alert_sev == "critical":
                         alarm_type = "critical_defect"
 
         from datetime import datetime, timezone

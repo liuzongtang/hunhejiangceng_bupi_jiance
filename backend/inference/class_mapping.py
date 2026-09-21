@@ -17,11 +17,13 @@ from backend.schemas.defect import (
     TIANCHI_CLASS_NAMES,
     TIANCHI_CLASS_NAMES_ZH,
     DefectType,
+    effective_alert_severity,
 )
 
 __all__ = [
     "TIANCHI_CLASS_NAMES",
     "TIANCHI_CLASS_NAMES_ZH",
+    "project_alert_severity",
     "project_code",
     "project_severity",
 ]
@@ -39,5 +41,13 @@ def project_severity(defect_type: str) -> str:
     """Map a 20-class type name to its severity (critical/major/medium/minor)."""
     try:
         return DEFECT_SEVERITY[DefectType(defect_type)].value
+    except (ValueError, KeyError):
+        return "info"
+
+
+def project_alert_severity(defect_type: str) -> str:
+    """Map a type name to its alerting severity, escalating lookalike classes."""
+    try:
+        return effective_alert_severity(DefectType(defect_type)).value
     except (ValueError, KeyError):
         return "info"
