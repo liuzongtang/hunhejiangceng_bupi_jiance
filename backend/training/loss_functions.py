@@ -56,10 +56,12 @@ def detection_loss(
         for i, target in enumerate(targets):
             t_boxes = target.get("boxes", [])
             if t_boxes and i < len(pred_boxes):
-                t_box = torch.tensor(t_boxes[0], dtype=torch.float32)
                 p_box = pred_boxes[i]
                 if isinstance(p_box, np.ndarray):
                     p_box = torch.from_numpy(p_box).float()
+                t_box = torch.tensor(
+                    t_boxes[0], dtype=torch.float32, device=p_box.device
+                )
                 loss = loss + F.smooth_l1_loss(p_box, t_box)
 
     return loss

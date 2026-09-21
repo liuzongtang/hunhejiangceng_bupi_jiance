@@ -1,5 +1,5 @@
 """
-Tests for 7-dimension reward computation.
+Tests for 7-dimension reward computation (differentiable).
 """
 
 import pytest
@@ -31,7 +31,9 @@ class TestDimensionRewards:
             "boxes": torch.tensor(
                 [[100, 200, 80, 60], [500, 300, 40, 40]], dtype=torch.float32
             ),
-            "classes": torch.tensor([0, 1]),  # 0=broken, 1=skip
+            # Sample 0 -> class 0 (broken), sample 1 -> class 1 (skip).
+            "logits": torch.tensor([[2.0, -2.0], [-2.0, 2.0]], dtype=torch.float32),
+            "classes": torch.tensor([0, 1]),
             "confidences": torch.tensor([0.95, 0.70]),
         }
 
@@ -43,7 +45,7 @@ class TestDimensionRewards:
         ]
 
     # ----------------------------------------------------------------
-    # D01: Localization (IoU)
+    # D01: Localization (soft IoU)
     # ----------------------------------------------------------------
 
     def test_loc_reward_perfect_iou(self, computer, sample_predictions, sample_targets):
@@ -60,7 +62,7 @@ class TestDimensionRewards:
         assert reward.item() == -1.0
 
     # ----------------------------------------------------------------
-    # D02: Classification
+    # D02: Classification (smooth accuracy)
     # ----------------------------------------------------------------
 
     def test_cls_reward_all_correct(self, computer, sample_predictions, sample_targets):
@@ -77,76 +79,83 @@ class TestDimensionRewards:
         assert reward.item() == -1.0
 
     # ----------------------------------------------------------------
-    # D03: ECE
+    # D03: Calibration
     # ----------------------------------------------------------------
 
     def test_cal_reward_valid_range(self, computer, sample_predictions, sample_targets):
-        """ECE reward should be <= 0 (negative or zero ECE → negative reward)."""
+        """Calibration reward should be <= 0."""
         reward = computer.compute_cal_reward(sample_predictions, sample_targets)
-        # ECE >= 0, so -ECE <= 0
         assert reward.item() <= 0.0
 
     # ----------------------------------------------------------------
-    # D04: Miss Detection
+    # D04: Miss Detection (soft)
     # ----------------------------------------------------------------
 
     def test_miss_reward_no_misses(self, computer, sample_predictions, sample_targets):
-        """When all targets are detected, reward should be 0."""
+        """When all targets are localized, reward should be ~0."""
         reward = computer.compute_miss_reward(sample_predictions, sample_targets)
-        assert reward.item() == 0.0
+        assert abs(reward.item()) < 0.05, f"Expected ~0, got {reward.item():.4f}"
 
     def test_miss_reward_with_misses(self, computer):
         """Missed targets should produce negative reward."""
         reward = computer.compute_miss_reward(
             {"boxes": torch.tensor([[0, 0, 10, 10]], dtype=torch.float32)},
-            [{"boxes": [[100, 100, 50, 50]]}],  # Far away → not detected
+            [{"boxes": [[100, 100, 50, 50]]}],  # Far away -> not detected
         )
         assert reward.item() < 0.0
 
     # ----------------------------------------------------------------
-    # D05: False Positive
+    # D05: False Positive (soft)
     # ----------------------------------------------------------------
 
     def test_fp_reward_no_fps(self, computer, sample_predictions, sample_targets):
-        """When all predictions match targets, reward should be 0."""
+        """When all predictions are well localized, reward should be ~0."""
         reward = computer.compute_fp_reward(sample_predictions, sample_targets)
-        assert reward.item() == 0.0
+        assert abs(reward.item()) < 0.05, f"Expected ~0, got {reward.item():.4f}"
 
     # ----------------------------------------------------------------
-    # D06 & D07: Sensitivity
+    # D06 & D07: Sensitivity (soft)
     # ----------------------------------------------------------------
 
     def test_broken_detected(self, computer):
-        """Detecting a broken defect should give +1.0."""
+        """High probability on the broken class should give reward near +1.0."""
         reward = computer.compute_broken_reward(
-            {"classes": torch.tensor([0])},
+            {"logits": torch.tensor([[10.0, -10.0]])},
             [{"labels": [0]}],
         )
-        assert reward.item() == 1.0
+        assert abs(reward.item() - 1.0) < 0.05, (
+            f"Expected ~1.0, got {reward.item():.4f}"
+        )
 
     def test_broken_missed(self, computer):
-        """Missing a broken defect should give -2.0."""
+        """Low probability on the broken class should give reward near -2.0."""
         reward = computer.compute_broken_reward(
-            {"classes": torch.tensor([1])},
+            {"logits": torch.tensor([[-10.0, 10.0]])},
             [{"labels": [0]}],
         )
-        assert reward.item() == -2.0
+        assert abs(reward.item() - (-2.0)) < 0.05, (
+            f"Expected ~-2.0, got {reward.item():.4f}"
+        )
 
     def test_skip_detected(self, computer):
-        """Detecting a skip defect should give +1.0."""
+        """High probability on the skip class should give reward near +1.0."""
         reward = computer.compute_skip_reward(
-            {"classes": torch.tensor([1])},
+            {"logits": torch.tensor([[-10.0, 10.0]])},
             [{"labels": [1]}],
         )
-        assert reward.item() == 1.0
+        assert abs(reward.item() - 1.0) < 0.05, (
+            f"Expected ~1.0, got {reward.item():.4f}"
+        )
 
     def test_skip_missed(self, computer):
-        """Missing a skip defect should give -2.0."""
+        """Low probability on the skip class should give reward near -2.0."""
         reward = computer.compute_skip_reward(
-            {"classes": torch.tensor([0])},
+            {"logits": torch.tensor([[10.0, -10.0]])},
             [{"labels": [1]}],
         )
-        assert reward.item() == -2.0
+        assert abs(reward.item() - (-2.0)) < 0.05, (
+            f"Expected ~-2.0, got {reward.item():.4f}"
+        )
 
     def test_default_class_ids(self):
         """Default D06/D07 ids should be the Tianchi broken/skip class sets."""
@@ -167,8 +176,40 @@ class TestDimensionRewards:
             assert isinstance(rewards[name], torch.Tensor)
 
 
+class TestDifferentiability:
+    """Regression: the reward tensors must backpropagate into the model."""
+
+    def test_rewards_backprop_to_logits_and_boxes(self):
+        comp = DimensionRewardComputer(broken_class_ids={0}, skip_class_ids={1})
+        logits = torch.tensor([[2.0, -2.0], [-2.0, 2.0]], requires_grad=True)
+        boxes = torch.tensor(
+            [[100, 200, 80, 60], [500, 300, 40, 40]],
+            dtype=torch.float32,
+            requires_grad=True,
+        )
+        preds = {
+            "logits": logits,
+            "boxes": boxes,
+            "classes": logits.argmax(dim=-1),
+            "confidences": logits.softmax(dim=-1).max(dim=-1).values,
+        }
+        targets = [
+            {"boxes": [[100, 200, 80, 60]], "labels": [0]},
+            {"boxes": [[500, 300, 40, 40]], "labels": [1]},
+        ]
+
+        rewards = comp.compute_all(preds, targets)
+        total = torch.stack([rewards[name] for name in DIMENSION_NAMES]).sum()
+        grads = torch.autograd.grad(total, (logits, boxes), allow_unused=True)
+
+        assert grads[0] is not None, "reward must produce gradients w.r.t. logits"
+        assert grads[1] is not None, "reward must produce gradients w.r.t. boxes"
+        assert grads[0].abs().sum() > 0
+        assert grads[1].abs().sum() > 0
+
+
 class TestBoxIoU:
-    """Tests for IoU computation."""
+    """Tests for the non-differentiable IoU helper."""
 
     def test_perfect_iou(self):
         """Identical boxes should have IoU = 1.0."""
@@ -183,7 +224,28 @@ class TestBoxIoU:
     def test_half_overlap(self):
         """Half-overlapping boxes."""
         iou = DimensionRewardComputer._box_iou([0, 0, 10, 10], [5, 0, 10, 10])
-        # Intersection: [5,0,10,10] → 5*10 = 50
-        # Union: 100 + 100 - 50 = 150
-        # IoU = 50/150 = 0.333...
         assert abs(iou - 1 / 3) < 0.01
+
+
+class TestSigmoidHead:
+    """RT-DETR's per-class focal/vfl head uses sigmoid (not softmax)."""
+
+    def test_sigmoid_cls_reward_uses_per_class_confidence(self):
+        comp = DimensionRewardComputer(head_type="sigmoid")
+        logits = torch.tensor([[5.0, -5.0]])  # sigmoid(5) ~ 0.993
+        reward = comp.compute_cls_reward({"logits": logits}, [{"labels": [0]}])
+        # p_true = sigmoid(5) -> reward = 2 * 0.993 - 1 ~ 0.987
+        assert reward.item() > 0.9
+
+    def test_sigmoid_sensitivity_reward_bounded(self):
+        comp = DimensionRewardComputer(
+            head_type="sigmoid", broken_class_ids={0}, skip_class_ids={1}
+        )
+        # Both classes 0 and 1 highly confident: p_crit = max (bounded <= 1).
+        logits = torch.tensor([[5.0, 5.0]])
+        reward = comp.compute_broken_reward({"logits": logits}, [{"labels": [0]}])
+        assert reward.item() <= 1.0
+
+    def test_default_stays_softmax(self):
+        """Default head_type must remain softmax (backward compatible)."""
+        assert DimensionRewardComputer().head_type == "softmax"

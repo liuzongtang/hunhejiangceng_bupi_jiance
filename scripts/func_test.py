@@ -124,16 +124,18 @@ print("\n--- Module 6: Hybrid Reward Training ---")
 from backend.training.dimension_rewards import DimensionRewardComputer
 
 comp = DimensionRewardComputer()
+logits = torch.full((1, 20), -5.0)
+logits[0, 9] = 5.0  # broken_warp (class 9) gets the highest logit
 preds = {
-    "boxes": np.array([[100, 100, 50, 50]], dtype=np.float32),
-    "classes": np.array([0]),
-    "confidences": np.array([0.95], dtype=np.float32),
+    "boxes": torch.tensor([[100, 100, 50, 50]], dtype=torch.float32),
+    "logits": logits,
+    "confidences": torch.tensor([0.95]),
 }
-targets = [{"boxes": [[100, 100, 50, 50]], "labels": [0]}]
+targets = [{"boxes": [[100, 100, 50, 50]], "labels": [9]}]  # broken_warp
 rewards = comp.compute_all(preds, targets)
 test("7 dimensions", lambda: len(rewards) == 7)
 test("D01 loc range", lambda: -1 <= rewards["loc"].item() <= 1)
-test("D06 broken value", lambda: rewards["broken"].item() in (-2.0, 0.0, 1.0))
+test("D06 broken detected", lambda: rewards["broken"].item() > 0.9)
 
 from backend.training.loss_functions import total_loss
 

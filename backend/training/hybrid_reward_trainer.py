@@ -83,7 +83,9 @@ class HybridRewardTrainer:
         self.num_classes = num_classes
 
         # Learnable dimension weights (Section 5.2.2)
-        self.dim_weights = nn.Parameter(torch.ones(NUM_DIMENSIONS) / NUM_DIMENSIONS)
+        self.dim_weights = nn.Parameter(
+            torch.ones(NUM_DIMENSIONS, device=self.device) / NUM_DIMENSIONS
+        )
 
         # Optimizer
         self.optimizer = optim.AdamW(
@@ -367,7 +369,7 @@ class HybridRewardTrainer:
             convergence_rates.append(rate)
 
         # Softmax: slow-converging → higher weight
-        rates_tensor = torch.tensor(convergence_rates)
+        rates_tensor = torch.tensor(convergence_rates, device=self.device)
         new_weights = torch.softmax(rates_tensor, dim=0)
 
         with torch.no_grad():
