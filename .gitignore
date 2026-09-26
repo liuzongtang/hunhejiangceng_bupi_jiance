@@ -45,3 +45,19 @@ deploy/
 # OS
 Thumbs.db
 .DS_Store
+
+# Private / core data — do NOT publish to GitHub
+# AITEX 数据集（244MB，勿上传）
+shujuji_AITEX/
+# 本地 ARS skills（第三方，勿上传）
+.claude/
+# 申请书填写临时文件
+_cap.json
+# 申请书/论文草稿临时文件
+_doc_*.txt
+# 校级科研项目立项申请书 docx（含个人信息，勿上传）
+附件2*
+# 申请书备份
+*.docx.bak
+# 测试用临时图片
+de4dac038f9aba0bb773f933acf8150b*

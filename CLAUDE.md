@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Textile fabric defect detection system — FastAPI backend + PyTorch/ONNX inference + 7-dimension hybrid reward training. Supports 20 defect types (Tianchi scheme) with real-time WebSocket alerts and a Chinese-language dashboard.
+Textile fabric defect detection system — FastAPI backend + PyTorch/ONNX inference + 7-dimension hybrid reward training. Supports 18 defect types (Tianchi scheme, 2 confusable pairs merged) with real-time WebSocket alerts and a Chinese-language dashboard.
 
 ## Commands
 

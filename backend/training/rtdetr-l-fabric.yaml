@@ -1,0 +1,62 @@
+# RT-DETR-l variant for fabric defect detection.
+#
+# Identical to ultralytics rtdetr-l.yaml except:
+#   * nc = 18 (Tianchi cloth-defect taxonomy)
+#   * the two nearest-neighbour upsampling ops in the hybrid-encoder neck are
+#     replaced with CARAFE content-aware reassembly (new name, injected via
+#     backend.training.modules into ultralytics.nn.tasks)
+#   * AIFI (dense self-attention) is replaced with DeformableAIFI, single-level
+#     deformable attention (new name; c1=256 passed explicitly)
+#   * the four CCFM RepC3 fusion blocks are replaced with ContextFusion
+#     (adaptive BiFPN-style weighted fusion). ContextFusion changes 2C -> C
+#     channels, so it is injected by monkeypatching ultralytics.nn.tasks.RepC3;
+#     the YAML still writes "RepC3" and the base-module channel accounting stays
+#     correct.
+
+# Parameters
+nc: 18 # number of classes
+scales: # model compound scaling constants
+  # [depth, width, max_channels]
+  l: [1.00, 1.00, 1024]
+
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, HGStem, [32, 48]] # 0-P2/4
+  - [-1, 6, HGBlock, [48, 128, 3]] # stage 1
+
+  - [-1, 1, DWConv, [128, 3, 2, 1, False]] # 2-P3/8
+  - [-1, 6, HGBlock, [96, 512, 3]] # stage 2
+
+  - [-1, 1, DWConv, [512, 3, 2, 1, False]] # 4-P4/16
+  - [-1, 6, HGBlock, [192, 1024, 5, True, False]] # cm, c2, k, light, shortcut
+  - [-1, 6, HGBlock, [192, 1024, 5, True, True]]
+  - [-1, 6, HGBlock, [192, 1024, 5, True, True]] # stage 3
+
+  - [-1, 1, DWConv, [1024, 3, 2, 1, False]] # 8-P5/32
+  - [-1, 6, HGBlock, [384, 2048, 5, True, False]] # stage 4
+
+head:
+  - [-1, 1, Conv, [256, 1, 1, None, 1, 1, False]] # 10 input_proj.2
+  - [-1, 1, DeformableAIFI, [256, 1024, 8]] # 11 (was AIFI [1024, 8], c1=256 explicit)
+  - [-1, 1, Conv, [256, 1, 1]] # 12, Y5, lateral_convs.0
+
+  - [-1, 1, CARAFE, [256, 256, 2]] # 13 (was nn.Upsample nearest)
+  - [7, 1, Conv, [256, 1, 1, None, 1, 1, False]] # 14 input_proj.1
+  - [[-2, -1], 1, Concat, [1]]
+  - [-1, 3, RepC3, [256]] # 16, fpn_blocks.0
+  - [-1, 1, Conv, [256, 1, 1]] # 17, Y4, lateral_convs.1
+
+  - [-1, 1, CARAFE, [256, 256, 2]] # 18 (was nn.Upsample nearest)
+  - [3, 1, Conv, [256, 1, 1, None, 1, 1, False]] # 19 input_proj.0
+  - [[-2, -1], 1, Concat, [1]] # cat backbone P4
+  - [-1, 3, RepC3, [256]] # X3 (21), fpn_blocks.1
+
+  - [-1, 1, Conv, [256, 3, 2]] # 22, downsample_convs.0
+  - [[-1, 17], 1, Concat, [1]] # cat Y4
+  - [-1, 3, RepC3, [256]] # F4 (24), pan_blocks.0
+
+  - [-1, 1, Conv, [256, 3, 2]] # 25, downsample_convs.1
+  - [[-1, 12], 1, Concat, [1]] # cat Y5
+  - [-1, 3, RepC3, [256]] # F5 (27), pan_blocks.1
+
+  - [[21, 24, 27], 1, RTDETRDecoder, [nc]] # RTDETRDecoder(P3, P4, P5)

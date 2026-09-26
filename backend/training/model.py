@@ -15,7 +15,7 @@ forward pass returns a dict with::
 backbone produces a global feature, and two linear heads predict (a) the image's
 dominant defect class and (b) one bounding box. This keeps the model fully
 compatible with the existing reward dimensions and loss functions while still
-learning to classify and localize the 20 Tianchi defect categories.
+learning to classify and localize the 18 Tianchi defect categories.
 
 For multi-defect-per-image training (e.g. several boxes per photo) this
 single-box model is a simplification; see the Ultralytics YOLOv8 path for
@@ -55,7 +55,7 @@ class SimpleDefectDetector(nn.Module):
 
     def __init__(
         self,
-        num_classes: int = 20,
+        num_classes: int = 18,
         image_size: Tuple[int, int] = (640, 640),
         hidden_dim: int = 512,
     ):

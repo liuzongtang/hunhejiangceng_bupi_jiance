@@ -52,7 +52,7 @@ Backend API for computer-vision-based fabric inspection on production lines.
 - **Model Management**: Register and deploy model updates
 - **System Monitoring**: Device status, model versions, resource metrics
 
-### Defect Types (20 Tianchi classes)
+### Defect Types (18 Tianchi classes)
 | Code  | Name          | Severity |
 |-------|---------------|----------|
 | HO-01 | Hole          | Critical |
@@ -66,14 +66,12 @@ Backend API for computer-vision-based fabric inspection on production lines.
 | LW-01 | Loose Warp    | Minor    |
 | BW-01 | Broken Warp   | Critical |
 | HW-01 | Hanging Warp  | Major    |
-| CF-01 | Coarse Weft   | Minor    |
 | WS-01 | Weft Shrink   | Minor    |
 | ST-02 | Size Stain    | Medium   |
 | KN-02 | Warping Knot  | Minor    |
 | SK-01 | Star Skip     | Major    |
 | BS-01 | Broken Spandex| Critical |
 | DS-01 | Dense Section | Major    |
-| SM-01 | Surface Mark  | Minor    |
 | WD-01 | Weave Defect  | Major    |
 """,
         version="1.0.0",
@@ -104,8 +102,9 @@ Backend API for computer-vision-based fabric inspection on production lines.
     app.include_router(detection.router)
     app.include_router(model.router)
     app.include_router(system.router)
-    from backend.routers import storage as storage_router
+    from backend.routers import simulator as simulator_router, storage as storage_router
 
+    app.include_router(simulator_router.router)
     app.include_router(storage_router.router)
 
     # WebSocket endpoint for real-time alerts

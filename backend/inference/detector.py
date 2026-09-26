@@ -232,8 +232,9 @@ class FabricDefectDetector:
 
         for det_list in detections_list:
             for det in det_list:
-                # Alert severity escalates lookalike classes (surface_mark ~
-                # broken_warp) so critical defects aren't silently downgraded.
+                # Alert severity may escalate to a visually-confusable
+                # higher-impact class (CONFUSABLE_HIGHER_IMPACT, empty after the
+                # 2026-09-23 merge), so critical defects aren't downgraded.
                 alert_sev = project_alert_severity(det["type"])
                 all_defects.append(
                     {

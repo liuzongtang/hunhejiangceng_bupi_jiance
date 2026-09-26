@@ -24,7 +24,9 @@ from backend.schemas.defect import TIANCHI_CLASS_NAMES
 
 logger = logging.getLogger(__name__)
 
-# Tianchi "smartdiagnosisofclothflaw" 20 defect categories (id 0..19).
+# Tianchi "smartdiagnosisofclothflaw" 18 defect categories (id 0..17), after the
+# 2026-09-23 merge of the two visually-indistinguishable pairs (surface_mark->
+# broken_warp, coarse_weft->weft_shrink).
 # The canonical names (and their order) live in backend.schemas.defect; the
 # README maps category ids 1..20 to: 破洞=1, 水渍/油渍/污渍=2, 三丝=3, 结头=4,
 # 花板跳=5, 百脚=6, 毛粒=7, 粗经=8, 松经=9, 断经=10, 吊经=11, 粗纬=12, 纬缩=13,
@@ -32,8 +34,8 @@ logger = logging.getLogger(__name__)
 # 磨痕/轧痕/修痕/烧毛痕=19, 死皱/云织/双纬/双经/跳纱/筘路/纬纱不良=20.
 
 # Critical class ids for the sensitivity dimensions D06/D07 (see dimension_rewards.py).
-TIANCHI_BROKEN_CLASS_IDS = {9, 16}  # broken_warp, broken_spandex
-TIANCHI_SKIP_CLASS_IDS = {15, 19}  # star_skip, weave_defect(跳纱)
+TIANCHI_BROKEN_CLASS_IDS = {9, 15}  # broken_warp, broken_spandex (18-class ids)
+TIANCHI_SKIP_CLASS_IDS = {14, 17}  # star_skip, weave_defect/跳纱 (18-class ids)
 
 
 @dataclass
@@ -56,7 +58,7 @@ class DatasetConfig:
 
     # Image settings
     image_size: Tuple[int, int] = (640, 640)
-    num_classes: int = len(TIANCHI_CLASS_NAMES)  # 20 Tianchi defect classes
+    num_classes: int = len(TIANCHI_CLASS_NAMES)  # 18 Tianchi defect classes
 
     # Augmentation
     augment: bool = True

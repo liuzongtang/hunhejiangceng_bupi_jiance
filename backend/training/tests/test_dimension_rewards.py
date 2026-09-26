@@ -160,8 +160,8 @@ class TestDimensionRewards:
     def test_default_class_ids(self):
         """Default D06/D07 ids should be the Tianchi broken/skip class sets."""
         comp = DimensionRewardComputer()
-        assert comp.broken_class_ids == {9, 16}
-        assert comp.skip_class_ids == {15, 19}
+        assert comp.broken_class_ids == {9, 15}
+        assert comp.skip_class_ids == {14, 17}
 
     # ----------------------------------------------------------------
     # Full 7-dim vector

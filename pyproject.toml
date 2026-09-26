@@ -48,6 +48,7 @@ ignore = [
     "E402",   # Module import not at top of file — intentional for optional dependency imports
     "RUF001", # Ambiguous unicode characters — Chinese punctuation is intentional in this project
     "RUF002", # Ambiguous unicode in docstrings — Chinese text is intentional
+    "RUF003", # Ambiguous unicode in comments — Chinese text is intentional
     "RUF012", # Mutable class defaults — used as read-only constants (DEFECT_CLASSES, etc.)
 ]
 

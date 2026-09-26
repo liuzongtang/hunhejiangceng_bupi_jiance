@@ -6,52 +6,131 @@
 <title>织物瑕疵检测 — 实时监控看板</title>
 <script src="/static/chart.min.js"></script>
 <style>
-:root{--bg:#0f172a;--bg2:#1e293b;--bg3:#334155;--text:#e2e8f0;--text2:#94a3b8;--accent:#38bdf8;--green:#22c55e;--red:#ef4444;--orange:#f97316;--yellow:#eab308}
+:root{
+  --bg:#e8ebf0;--panel:#ffffff;--panel2:#f4f6f9;--border:#c9ced8;--border2:#dfe3ea;
+  --text:#1b2333;--text2:#5b6472;--muted:#8a93a3;
+  --accent:#1565c0;--green:#1e8e3e;--red:#d93025;--orange:#e8710a;--yellow:#b07d09;
+  --num:'Consolas','JetBrains Mono','SF Mono','Courier New',monospace;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Microsoft YaHei','Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-.header{background:var(--bg2);border-bottom:2px solid var(--accent);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
-.header h1{font-size:18px;font-weight:600}
-.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--bg3);padding:0 16px}
-.tab{padding:12px 20px;cursor:pointer;border-bottom:2px solid transparent;color:var(--text2);font-size:14px}
-.tab:hover{color:var(--text)}.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-.content{padding:20px;max-width:1400px;margin:0 auto}
+html,body{height:100%}
+body{font-family:'Microsoft YaHei','Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+
+/* ===== header ===== */
+.header{background:#fff;border-bottom:3px solid var(--accent);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:0 1px 4px rgba(20,30,50,.08)}
+.header .brand{display:flex;align-items:center;gap:12px}
+.header .brand .logo{width:8px;height:34px;background:var(--accent);border-radius:2px}
+.header h1{font-size:18px;font-weight:700;letter-spacing:1px;color:#12365f}
+.header .sub{font-size:12px;color:var(--text2)}
+.header .hdr-right{display:flex;align-items:center;gap:18px;font-size:13px}
+.header .clock{font-family:var(--num);font-size:15px;font-weight:600;color:#12365f}
+
+/* ===== alarm banner ===== */
+.banner{background:#fff;border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:16px;flex-shrink:0;min-height:40px}
+.banner .sys-state{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;padding:4px 12px;border-radius:3px;border:1px solid}
+.banner .sys-state.normal{color:var(--green);border-color:#a5d6a7;background:#e8f5e9}
+.banner .sys-state.alarm{color:var(--red);border-color:#ef9a9a;background:#ffebee;animation:blink 1s steps(2) infinite}
+.banner .sep{width:1px;height:20px;background:var(--border2)}
+.banner .ticker{flex:1;font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.banner .ticker b{color:var(--red)}
+@keyframes blink{50%{opacity:.55}}
+
+/* ===== tabs ===== */
+.tabs{display:flex;background:#fff;border-bottom:1px solid var(--border);padding:0 16px;flex-shrink:0}
+.tab{padding:13px 22px;cursor:pointer;border-bottom:3px solid transparent;color:var(--text2);font-size:14px;font-weight:600}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);background:linear-gradient(180deg,transparent,rgba(21,101,192,.06))}
+
+/* ===== content ===== */
+.content{padding:18px 20px;max-width:1500px;margin:0 auto;width:100%;flex:1}
 .panel{display:none}.panel.active{display:block}
-.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
-.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.card{background:var(--bg2);border-radius:10px;padding:18px;border:1px solid var(--bg3)}
-.card h3{font-size:13px;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}
-.card .value{font-size:28px;font-weight:700}
-.green{color:var(--green)}.red{color:var(--red)}.accent{color:var(--accent)}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+
+/* industrial panel with corner brackets */
+.panel-frame{position:relative;background:var(--panel);border:1px solid var(--border);padding:16px;background-repeat:no-repeat;
+  background-image:
+    linear-gradient(var(--accent),var(--accent)),linear-gradient(var(--accent),var(--accent)),
+    linear-gradient(var(--accent),var(--accent)),linear-gradient(var(--accent),var(--accent)),
+    linear-gradient(var(--accent),var(--accent)),linear-gradient(var(--accent),var(--accent)),
+    linear-gradient(var(--accent),var(--accent)),linear-gradient(var(--accent),var(--accent));
+  background-size:14px 2px,2px 14px,14px 2px,2px 14px,14px 2px,2px 14px,14px 2px,2px 14px;
+  background-position:top left,top left,top right,top right,bottom left,bottom left,bottom right,bottom right}
+.panel-frame h3{font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:8px}
+.panel-frame h3::before{content:"";width:4px;height:14px;background:var(--accent);border-radius:1px}
+
+/* KPI */
+.kpi{background:var(--panel);border:1px solid var(--border);padding:14px 16px;position:relative;background-repeat:no-repeat;
+  background-image:linear-gradient(var(--accent),var(--accent)),linear-gradient(var(--accent),var(--accent)),linear-gradient(var(--accent),var(--accent)),linear-gradient(var(--accent),var(--accent));
+  background-size:12px 2px,2px 12px,12px 2px,2px 12px;background-position:top left,top left,bottom right,bottom right}
+.kpi .kpi-label{font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.kpi .kpi-value{font-family:var(--num);font-size:30px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.kpi .kpi-unit{font-size:11px;color:var(--muted);margin-top:4px}
+.kpi.green .kpi-value{color:var(--green)}.kpi.red .kpi-value{color:var(--red)}.kpi.accent .kpi-value{color:var(--accent)}
+
+/* tables */
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;padding:8px 12px;color:var(--text2);border-bottom:1px solid var(--bg3)}
-td{padding:8px 12px;border-bottom:1px solid rgba(51,65,85,.5)}
-.badge{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+th{text-align:left;padding:9px 12px;color:var(--text2);background:var(--panel2);border-bottom:2px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:9px 12px;border-bottom:1px solid var(--border2)}
+tbody tr:nth-child(even){background:#fafbfd}
+tbody tr:hover{background:#f0f4fa}
+
+/* badges */
+.badge{padding:2px 9px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.5px}
 .badge.critical{background:var(--red);color:#fff}.badge.major{background:var(--orange);color:#fff}
-.badge.medium{background:var(--yellow);color:#000}.badge.minor{background:var(--accent);color:#000}
-.alert-item{padding:10px 14px;border-radius:6px;margin-bottom:8px;border-left:4px solid;font-size:13px}
-.alert-item.critical{border-color:var(--red);background:rgba(239,68,68,.1)}
-.alert-item.major{border-color:var(--orange);background:rgba(249,115,22,.1)}
+.badge.medium{background:var(--yellow);color:#fff}.badge.minor{background:var(--accent);color:#fff}
+.badge.info{background:var(--muted);color:#fff}
+
+/* alerts */
+.alert-item{padding:10px 14px;border-radius:3px;margin-bottom:8px;border-left:4px solid;font-size:13px;background:#fff;border:1px solid var(--border2);border-left-width:4px}
+.alert-item.critical{border-left-color:var(--red);background:#fff5f5}
+.alert-item.major{border-left-color:var(--orange);background:#fff8f0}
+.alert-item.suspected_critical{border-left-color:var(--red);background:#fff5f5}
+
 .chart-wrap{position:relative;height:260px}.chart-wrap canvas{width:100%!important}
 .range-bar{display:flex;gap:8px;margin-bottom:16px}
-.range-btn{padding:6px 14px;border-radius:6px;border:1px solid var(--bg3);background:var(--bg2);color:var(--text2);cursor:pointer;font-size:13px}
-.range-btn.active{background:var(--accent);color:#000;border-color:var(--accent)}
-.dash-input{background:var(--bg);border:1px solid var(--bg3);color:var(--text);padding:6px 10px;border-radius:4px}
-.dash-btn{padding:6px 14px;border-radius:4px;border:none;cursor:pointer;font-weight:600;font-size:13px}
-.dash-btn.accent{background:var(--accent);color:#000}.dash-btn.green{background:var(--green);color:#000}
+.range-btn{padding:6px 16px;border-radius:3px;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-size:13px;font-weight:600}
+.range-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dash-input{background:#fff;border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:3px;font-size:13px}
+.dash-btn{padding:7px 16px;border-radius:3px;border:1px solid var(--border);cursor:pointer;font-weight:600;font-size:13px;background:#fff;color:var(--text)}
+.dash-btn.accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dash-btn.green{background:var(--green);color:#fff;border-color:var(--green)}
 .status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px}
 .status-dot.online{background:var(--green);box-shadow:0 0 6px var(--green)}
 .status-dot.offline{background:var(--red)}
+
+/* ===== status bar ===== */
+.statusbar{background:#fff;border-top:2px solid var(--accent);padding:8px 20px;display:flex;align-items:center;gap:22px;font-size:12px;color:var(--text2);flex-shrink:0}
+.statusbar .stat-item{display:flex;align-items:center;gap:7px}
+.statusbar .stat-item b{color:var(--text);font-family:var(--num);font-size:13px;font-variant-numeric:tabular-nums}
+.statusbar .stat-item .lbl{color:var(--muted)}
+.statusbar .spacer{flex:1}
 </style>
 </head>
 <body>
 
 <div class="header">
-  <h1>织物瑕疵检测系统</h1>
-  <div style="display:flex;align-items:center;gap:16px">
-    <span id="health"></span>
-    <span style="font-size:12px;color:var(--text2)" id="clock"></span>
+  <div class="brand">
+    <div class="logo"></div>
+    <div>
+      <h1>织物瑕疵检测系统</h1>
+      <div class="sub">FABRIC DEFECT DETECTION · 实时监控</div>
+    </div>
   </div>
+  <div class="hdr-right">
+    <span id="health"></span>
+    <span class="clock" id="clock"></span>
+  </div>
+</div>
+
+<div class="banner">
+  <div class="sys-state normal" id="sys-state">● 系统正常</div>
+  <div class="sep"></div>
+  <span style="font-size:12px;color:var(--muted)">24h 告警</span>
+  <b id="banner-alert-count" style="font-family:var(--num);font-size:16px;color:var(--red)">0</b>
+  <div class="sep"></div>
+  <div class="ticker" id="banner-ticker">最新告警：无</div>
 </div>
 
 <div class="tabs">
@@ -66,11 +145,11 @@ td{padding:8px 12px;border-bottom:1px solid rgba(51,65,85,.5)}
 <!-- OVERVIEW -->
 <div id="panel-overview" class="panel active">
   <div class="grid4" id="kpi-cards"></div>
-  <div class="card" style="margin-top:16px"><h3>缺陷趋势 (24小时)</h3><div class="chart-wrap" style="height:300px"><canvas id="trendChart"></canvas></div></div>
-  <div class="grid3" style="margin-top:16px">
-    <div class="card"><h3>缺陷类型分布</h3><div class="chart-wrap"><canvas id="typeChart"></canvas></div></div>
-    <div class="card"><h3>严重度分布</h3><div class="chart-wrap"><canvas id="sevDonut"></canvas></div></div>
-    <div class="card" id="alert-summary-card"><h3>告警汇总 (24h)</h3></div>
+  <div class="panel-frame" style="margin-top:14px"><h3>缺陷趋势 (24小时)</h3><div class="chart-wrap" style="height:300px"><canvas id="trendChart"></canvas></div></div>
+  <div class="grid3" style="margin-top:14px">
+    <div class="panel-frame"><h3>缺陷类型分布</h3><div class="chart-wrap"><canvas id="typeChart"></canvas></div></div>
+    <div class="panel-frame"><h3>严重度分布</h3><div class="chart-wrap"><canvas id="sevDonut"></canvas></div></div>
+    <div class="panel-frame" id="alert-summary-card"><h3>告警汇总 (24h)</h3></div>
   </div>
 </div>
 
@@ -78,26 +157,26 @@ td{padding:8px 12px;border-bottom:1px solid rgba(51,65,85,.5)}
 <div id="panel-detection" class="panel">
   <div class="range-bar" id="det-range"></div>
   <div class="grid2">
-    <div class="card"><h3>检测趋势</h3><div class="chart-wrap"><canvas id="detTrendChart"></canvas></div></div>
-    <div class="card"><h3>缺陷类型趋势</h3><div class="chart-wrap"><canvas id="heatmapChart"></canvas></div></div>
+    <div class="panel-frame"><h3>检测趋势</h3><div class="chart-wrap"><canvas id="detTrendChart"></canvas></div></div>
+    <div class="panel-frame"><h3>缺陷类型趋势</h3><div class="chart-wrap"><canvas id="heatmapChart"></canvas></div></div>
   </div>
-  <div class="card" style="margin-top:16px"><h3>最近报告</h3><table><thead><tr><th>报告ID</th><th>设备</th><th>缺陷数</th><th>类型</th><th>告警</th><th>时间</th></tr></thead><tbody id="report-list"></tbody></table></div>
+  <div class="panel-frame" style="margin-top:14px"><h3>最近报告</h3><table><thead><tr><th>报告ID</th><th>设备</th><th>缺陷数</th><th>类型</th><th>告警</th><th>时间</th></tr></thead><tbody id="report-list"></tbody></table></div>
 </div>
 
 <!-- ALERTS -->
 <div id="panel-alerts" class="panel">
   <div class="range-bar" id="alert-range"></div>
   <div class="grid2">
-    <div class="card"><h3>告警时间轴</h3><div class="chart-wrap"><canvas id="alertTimeChart"></canvas></div></div>
-    <div class="card"><h3>告警频率</h3><div class="chart-wrap"><canvas id="alertFreqChart"></canvas></div></div>
+    <div class="panel-frame"><h3>告警时间轴</h3><div class="chart-wrap"><canvas id="alertTimeChart"></canvas></div></div>
+    <div class="panel-frame"><h3>告警频率</h3><div class="chart-wrap"><canvas id="alertFreqChart"></canvas></div></div>
   </div>
-  <div class="card" style="margin-top:16px"><h3>告警列表</h3><div id="alert-feed"></div></div>
+  <div class="panel-frame" style="margin-top:14px"><h3>告警列表</h3><div id="alert-feed"></div></div>
 </div>
 
 <!-- MODEL -->
 <div id="panel-model" class="panel">
   <div class="grid3" id="model-cards"></div>
-  <div class="card" style="margin-top:16px"><h3>注册新模型</h3>
+  <div class="panel-frame" style="margin-top:14px"><h3>注册新模型</h3>
     <div style="display:flex;gap:8px">
       <input class="dash-input" id="newModelId" placeholder="模型ID" style="flex:1">
       <input class="dash-input" id="newModelAcc" placeholder="准确率" value="0.96" style="width:80px">
@@ -105,35 +184,46 @@ td{padding:8px 12px;border-bottom:1px solid rgba(51,65,85,.5)}
     </div>
     <div style="font-size:12px;margin-top:6px;color:var(--text2)" id="modelRegStatus"></div>
   </div>
-  <div class="card" style="margin-top:16px"><h3>版本历史</h3><table><thead><tr><th>模型ID</th><th>类型</th><th>准确率</th><th>mAP@50</th><th>状态</th><th>发布</th></tr></thead><tbody id="model-history"></tbody></table></div>
+  <div class="panel-frame" style="margin-top:14px"><h3>版本历史</h3><table><thead><tr><th>模型ID</th><th>类型</th><th>准确率</th><th>mAP@50</th><th>状态</th><th>发布</th></tr></thead><tbody id="model-history"></tbody></table></div>
 </div>
 
 <!-- STORAGE -->
 <div id="panel-storage" class="panel">
   <div class="grid2">
-    <div class="card"><h3>上传图像</h3>
-      <input type="file" id="uploadFile" accept="image/*" style="color:var(--text);margin:8px 0;width:100%">
+    <div class="panel-frame"><h3>上传图像</h3>
+      <input type="file" id="uploadFile" accept="image/*" style="margin:8px 0;width:100%">
       <input class="dash-input" id="uploadDevice" value="CAM-001" style="width:100%;margin-bottom:4px" placeholder="设备ID">
       <button class="dash-btn accent" onclick="uploadImage()" style="width:100%">上传</button>
       <div style="font-size:12px;margin-top:8px;color:var(--text2)" id="uploadStatus"></div>
     </div>
-    <div class="card"><h3>运行推理</h3>
+    <div class="panel-frame"><h3>运行推理</h3>
       <p style="font-size:12px;color:var(--text2);margin-bottom:8px">对已上传图像运行检测</p>
       <input class="dash-input" id="inferDevice" value="CAM-001" style="width:100%;margin-bottom:4px">
       <button class="dash-btn green" onclick="runInference()" style="width:100%">推理</button>
       <div style="font-size:12px;margin-top:8px;color:var(--text2)" id="inferStatus"></div>
     </div>
   </div>
-  <div class="card" style="margin-top:16px"><h3>已存储图像</h3>
-    <button class="dash-btn" style="background:var(--bg3);color:var(--text);margin-bottom:8px" onclick="loadStorageImages()">刷新</button>
+  <div class="panel-frame" style="margin-top:14px"><h3>已存储图像</h3>
+    <button class="dash-btn" style="margin-bottom:8px" onclick="loadStorageImages()">刷新</button>
     <table><thead><tr><th>文件名</th><th>大小</th><th>操作</th></tr></thead><tbody id="storage-list"></tbody></table>
   </div>
 </div>
+</div>
 
-<div style="font-size:12px;color:var(--text2);text-align:right;margin-top:12px">自动刷新: 5秒 | <span id="last-update"></span></div>
+<div class="statusbar">
+  <div class="stat-item"><span class="lbl">在线设备</span><b id="sb-devices">--</b></div>
+  <div class="stat-item"><span class="lbl">检测总数</span><b id="sb-defects">0</b></div>
+  <div class="stat-item"><span class="lbl">24h 告警</span><b id="sb-alerts" style="color:var(--red)">0</b></div>
+  <div class="stat-item"><span class="lbl">模型</span><b id="sb-model">--</b></div>
+  <div class="spacer"></div>
+  <div class="stat-item"><span class="lbl">自动刷新 5s · 最后更新</span><b id="last-update">--</b></div>
 </div>
 
 <script>
+Chart.defaults.color='#5b6472';
+Chart.defaults.borderColor='#dfe3ea';
+Chart.defaults.font.family="'Microsoft YaHei','Segoe UI',sans-serif";
+
 var charts={};
 function desChart(n){if(charts[n]){charts[n].destroy();delete charts[n];}}
 function setChart(n,c){desChart(n);charts[n]=c;}
@@ -150,7 +240,7 @@ function switchTab(n){
   if(n==='storage') loadStorageImages();
 }
 
-function badge(s){return '<span class=\"badge '+(s||'minor')+'\">'+(s||'minor')+'</span>';}
+function badge(s){return '<span class="badge '+(s||'info')+'">'+(s||'info')+'</span>';}
 
 function renderRange(cid,target){
   var ranges=[{v:'1h',t:'1小时'},{v:'24h',t:'24小时'},{v:'7d',t:'7天'},{v:'30d',t:'30天'}];
@@ -159,7 +249,7 @@ function renderRange(cid,target){
   for(var i=0;i<ranges.length;i++){
     var r=ranges[i];
     var cls=r.v===cur?'range-btn active':'range-btn';
-    html+='<button class=\"'+cls+'\" data-range=\"'+r.v+'\" data-cid=\"'+cid+'\" data-target=\"'+target+'\">'+r.t+'</button>';
+    html+='<button class="'+cls+'" data-range="'+r.v+'" data-cid="'+cid+'" data-target="'+target+'">'+r.t+'</button>';
   }
   document.getElementById(cid).innerHTML=html;
   document.getElementById(cid).onclick=function(e){
@@ -182,22 +272,29 @@ async function loadOverview(){
   if(!s||!s.data) return;
   var d=s.data,sd=st&&st.data?st.data:{};
   var devs=d.devices||[],online=devs.filter(function(x){return x.status==='online'}).length;
+  var alerts=sd.alerts_triggered||0;
+  var defects=sd.total_defects||0;
   document.getElementById('kpi-cards').innerHTML=
-    '<div class=\"card\"><h3>在线设备</h3><div class=\"value green\">'+online+'/'+devs.length+'</div></div>'+
-    '<div class=\"card\"><h3>检测总数</h3><div class=\"value accent\">'+(sd.total_defects||0).toLocaleString()+'</div></div>'+
-    '<div class=\"card\"><h3>告警 (24h)</h3><div class=\"value '+(sd.alerts_triggered>0?'red':'green')+'\">'+(sd.alerts_triggered||0)+'</div></div>'+
-    '<div class=\"card\"><h3>模型版本</h3><div class=\"value\" style=\"font-size:20px\">'+(d.model?d.model.current_version:'N/A')+'</div></div>';
+    '<div class="kpi green"><div class="kpi-label">在线设备</div><div class="kpi-value">'+online+'<span style="font-size:16px;color:var(--text2)"> / '+devs.length+'</span></div><div class="kpi-unit">ONLINE DEVICES</div></div>'+
+    '<div class="kpi accent"><div class="kpi-label">检测总数</div><div class="kpi-value">'+defects.toLocaleString()+'</div><div class="kpi-unit">TOTAL DETECTIONS</div></div>'+
+    '<div class="kpi '+(alerts>0?'red':'green')+'"><div class="kpi-label">告警 (24h)</div><div class="kpi-value">'+alerts+'</div><div class="kpi-unit">ALARMS</div></div>'+
+    '<div class="kpi"><div class="kpi-label">模型版本</div><div class="kpi-value" style="font-size:22px">'+(d.model?d.model.current_version:'N/A')+'</div><div class="kpi-unit">MODEL VERSION</div></div>';
+  document.getElementById('sb-devices').textContent=online+' / '+devs.length;
+  document.getElementById('sb-defects').textContent=defects.toLocaleString();
+  document.getElementById('sb-alerts').textContent=alerts;
+  document.getElementById('sb-model').textContent=(d.model?d.model.current_version:'--');
+  document.getElementById('banner-alert-count').textContent=alerts;
   var trend=sd.trend||{labels:[],data:[]};
-  setChart('trend',new Chart(document.getElementById('trendChart'),{type:'line',data:{labels:trend.labels,datasets:[{label:'缺陷/小时',data:trend.data,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,.1)',fill:true,tension:.3}]},options:{responsive:true,maintainAspectRatio:false}}));
+  setChart('trend',new Chart(document.getElementById('trendChart'),{type:'line',data:{labels:trend.labels,datasets:[{label:'缺陷/小时',data:trend.data,borderColor:'#1565c0',backgroundColor:'rgba(21,101,192,.12)',fill:true,tension:.3,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:12}}},scales:{x:{grid:{display:false}},y:{grid:{color:'#eef1f5'}}}}}));
   var types=sd.by_type||{};
   if(Object.keys(types).length){
-    setChart('type',new Chart(document.getElementById('typeChart'),{type:'bar',data:{labels:Object.keys(types),datasets:[{label:'数量',data:Object.values(types),backgroundColor:['#ef4444','#f97316','#eab308','#84cc16','#22c55e','#10b981','#14b8a6','#06b6d4','#0ea5e9','#3b82f6','#6366f1','#8b5cf6','#a855f7','#d946ef','#ec4899','#f43f5e','#f59e0b','#facc15','#a3e635','#38bdf8']}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}));
+    setChart('type',new Chart(document.getElementById('typeChart'),{type:'bar',data:{labels:Object.keys(types),datasets:[{label:'数量',data:Object.values(types),backgroundColor:['#d93025','#e8710a','#b07d09','#7cb342','#1e8e3e','#00897b','#00acc1','#039be5','#1e88e5','#1565c0','#5e35b1','#8e24aa','#c2185b','#d81b60','#e91e63','#f4511e','#f9a825','#c0ca33','#8bc34a','#1565c0']}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#eef1f5'}},y:{grid:{display:false}}}}}));
   }
   var sevs=sd.by_severity||{};
   if(Object.keys(sevs).length){
-    setChart('sevDonut',new Chart(document.getElementById('sevDonut'),{type:'doughnut',data:{labels:Object.keys(sevs),datasets:[{data:Object.values(sevs),backgroundColor:['#ef4444','#f97316','#eab308','#38bdf8','#94a3b8']}]},options:{responsive:true,maintainAspectRatio:false}}));
+    setChart('sevDonut',new Chart(document.getElementById('sevDonut'),{type:'doughnut',data:{labels:Object.keys(sevs),datasets:[{data:Object.values(sevs),backgroundColor:['#d93025','#e8710a','#b07d09','#1565c0','#8a93a3'],borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%'}}));
   }
-  document.getElementById('alert-summary-card').innerHTML='<h3>告警汇总 (24h)</h3><div style=\"font-size:40px;font-weight:700;text-align:center;padding:20px\" class=\"'+(sd.alerts_triggered>0?'red':'green')+'\">'+(sd.alerts_triggered||0)+'</div><p style=\"text-align:center;color:var(--text2)\">次告警触发</p>';
+  document.getElementById('alert-summary-card').innerHTML='<h3>告警汇总 (24h)</h3><div style="font-family:var(--num);font-size:56px;font-weight:700;text-align:center;padding:12px" class="'+(alerts>0?'red':'green')+'">'+alerts+'</div><p style="text-align:center;color:var(--text2);font-size:13px">次告警触发</p>';
 }
 
 // === DETECTION ===
@@ -209,14 +306,14 @@ async function loadDetection(range){
   if(!d||!d.data) return;
   var reports=d.data||[],sd=st&&st.data?st.data:{};
   var trend=sd.trend||{labels:[],data:[]};
-  setChart('detTrend',new Chart(document.getElementById('detTrendChart'),{type:'line',data:{labels:trend.labels,datasets:[{label:'缺陷',data:trend.data,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.1)',fill:true,tension:.3}]},options:{responsive:true,maintainAspectRatio:false}}));
+  setChart('detTrend',new Chart(document.getElementById('detTrendChart'),{type:'line',data:{labels:trend.labels,datasets:[{label:'缺陷',data:trend.data,borderColor:'#1e8e3e',backgroundColor:'rgba(30,142,62,.12)',fill:true,tension:.3,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:12}}},scales:{x:{grid:{display:false}},y:{grid:{color:'#eef1f5'}}}}}));
   var typesList=[];
   reports.forEach(function(r){if(r.by_type) Object.keys(r.by_type).forEach(function(t){if(typesList.indexOf(t)<0) typesList.push(t);});});
   typesList=typesList.slice(0,20);
   var labels=sd.trend?sd.trend.labels.slice(-12):[];
   if(typesList.length&&labels.length){
     var matrix=typesList.map(function(t){return labels.map(function(){return 0;});});
-    setChart('heatmap',new Chart(document.getElementById('heatmapChart'),{type:'bar',data:{labels:labels,datasets:typesList.map(function(t,i){return {label:t,data:matrix[i],backgroundColor:['#ef4444','#f97316','#eab308','#84cc16','#22c55e','#10b981','#14b8a6','#06b6d4','#0ea5e9','#3b82f6','#6366f1','#8b5cf6','#a855f7','#d946ef','#ec4899','#f43f5e','#f59e0b','#facc15','#a3e635','#38bdf8'][i]||'#94a3b8'};})},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true}}}}));
+    setChart('heatmap',new Chart(document.getElementById('heatmapChart'),{type:'bar',data:{labels:labels,datasets:typesList.map(function(t,i){return {label:t,data:matrix[i],backgroundColor:['#d93025','#e8710a','#b07d09','#7cb342','#1e8e3e','#00897b','#00acc1','#039be5','#1e88e5','#1565c0','#5e35b1','#8e24aa','#c2185b','#d81b60','#e91e63','#f4511e','#f9a825','#c0ca33','#8bc34a','#1565c0'][i]||'#8a93a3'};})},options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,grid:{color:'#eef1f5'}}}}}));
   }
   document.getElementById('report-list').innerHTML=reports.slice(0,20).map(function(r){
     return '<tr><td>'+r.report_id+'</td><td>'+r.device_id+'</td><td>'+r.total_defects+'</td><td>'+(r.by_type?Object.entries(r.by_type).map(function(e){return e[0]+':'+e[1];}).join(', '):'--')+'</td><td>'+(r.alarm&&r.alarm.triggered?badge(r.alarm.alarm_type||'major'):'--')+'</td><td>'+(r.timestamp?new Date(r.timestamp).toLocaleString():'--')+'</td></tr>';
@@ -236,16 +333,16 @@ async function loadAlerts(range){
   alerts.forEach(function(a){var h=new Date(a.timestamp).getHours()+':00';alertHours[h]=(alertHours[h]||0)+1;});
   var sortedKeys=Object.keys(alertHours).sort();
   if(sortedKeys.length){
-    setChart('alertTime',new Chart(document.getElementById('alertTimeChart'),{type:'bar',data:{labels:sortedKeys,datasets:[{label:'告警',data:sortedKeys.map(function(k){return alertHours[k];}),backgroundColor:'#ef4444'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}}));
+    setChart('alertTime',new Chart(document.getElementById('alertTimeChart'),{type:'bar',data:{labels:sortedKeys,datasets:[{label:'告警',data:sortedKeys.map(function(k){return alertHours[k];}),backgroundColor:'#d93025'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'#eef1f5'}}}}}));
   }
   var freqMap={};
   alerts.forEach(function(a){var t=a.alarm?a.alarm.alarm_type:'unknown';freqMap[t]=(freqMap[t]||0)+1;});
   if(Object.keys(freqMap).length){
-    setChart('alertFreq',new Chart(document.getElementById('alertFreqChart'),{type:'polarArea',data:{labels:Object.keys(freqMap),datasets:[{data:Object.values(freqMap),backgroundColor:['#ef4444','#f97316','#eab308','#38bdf8','#94a3b8']}]},options:{responsive:true,maintainAspectRatio:false}}));
+    setChart('alertFreq',new Chart(document.getElementById('alertFreqChart'),{type:'polarArea',data:{labels:Object.keys(freqMap),datasets:[{data:Object.values(freqMap),backgroundColor:['#d93025','#e8710a','#b07d09','#1565c0','#8a93a3'],borderColor:'#fff',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false}}));
   }
   document.getElementById('alert-feed').innerHTML=alerts.length?alerts.map(function(r){
-    return '<div class=\"alert-item '+(r.alarm?r.alarm.alarm_type:'major')+'\"><strong>'+(r.alarm?(r.alarm.alarm_type||'ALERT').toUpperCase():'ALERT')+'</strong> | 设备: '+r.device_id+' | 缺陷: '+r.total_defects+' | 操作: '+(r.alarm?r.alarm.action:'N/A')+' | <span style=\"color:var(--text2)\">'+new Date(r.timestamp).toLocaleString()+'</span></div>';
-  }).join(''):'<p style=\"color:var(--green)\">暂无告警</p>';
+    return '<div class="alert-item '+(r.alarm?r.alarm.alarm_type:'major')+'"><strong>'+(r.alarm?(r.alarm.alarm_type||'ALERT').toUpperCase():'ALERT')+'</strong> | 设备: '+r.device_id+' | 缺陷: '+r.total_defects+' | 操作: '+(r.alarm?r.alarm.action:'N/A')+' | <span style="color:var(--text2)">'+new Date(r.timestamp).toLocaleString()+'</span></div>';
+  }).join(''):'<p style="color:var(--green)">暂无告警</p>';
 }
 
 // === MODEL ===
@@ -255,9 +352,9 @@ async function loadModel(){
   if(d&&d.data){
     var m=d.data;
     document.getElementById('model-cards').innerHTML=
-      '<div class=\"card\"><h3>当前版本</h3><div class=\"value accent\">'+(m.model_id||'N/A')+'</div></div>'+
-      '<div class=\"card\"><h3>类型</h3><div class=\"value\" style=\"font-size:20px\">'+(m.model_type||'N/A')+'</div></div>'+
-      '<div class=\"card\"><h3>准确率</h3><div class=\"value green\">'+(m.accuracy?((m.accuracy*100).toFixed(1)+'%'):'N/A')+'</div></div>';
+      '<div class="kpi accent"><div class="kpi-label">当前版本</div><div class="kpi-value" style="font-size:22px">'+(m.model_id||'N/A')+'</div><div class="kpi-unit">CURRENT VERSION</div></div>'+
+      '<div class="kpi"><div class="kpi-label">类型</div><div class="kpi-value" style="font-size:22px">'+(m.model_type||'N/A')+'</div><div class="kpi-unit">MODEL TYPE</div></div>'+
+      '<div class="kpi green"><div class="kpi-label">准确率</div><div class="kpi-value">'+(m.accuracy?((m.accuracy*100).toFixed(1)+'%'):'N/A')+'</div><div class="kpi-unit">ACCURACY</div></div>';
   }
   if(h&&h.data){
     document.getElementById('model-history').innerHTML=h.data.map(function(m){
@@ -293,9 +390,9 @@ async function loadStorageImages(){
   var items=d&&d.data?d.data:[];
   var listHtml='';
   for(var j=0;j<items.length;j++){
-    listHtml+='<tr><td>'+items[j].name+'</td><td>'+(items[j].size/1024).toFixed(1)+' KB</td><td><a href=\"/api/v1/storage/download/'+items[j].name+'\" style=\"color:var(--accent)\" target=\"_blank\">下载</a> | <button data-name=\"'+items[j].name+'\" class=\"del-btn\" style=\"color:var(--red);background:none;border:none;cursor:pointer;font-size:13px\">删除</button></td></tr>';
+    listHtml+='<tr><td>'+items[j].name+'</td><td>'+(items[j].size/1024).toFixed(1)+' KB</td><td><a href="/api/v1/storage/download/'+items[j].name+'" style="color:var(--accent)" target="_blank">下载</a> | <button data-name="'+items[j].name+'" class="del-btn" style="color:var(--red);background:none;border:none;cursor:pointer;font-size:13px">删除</button></td></tr>';
   }
-  document.getElementById('storage-list').innerHTML=items.length?listHtml:'<tr><td colspan=\"3\" style=\"color:var(--text2)\">暂无图像</td></tr>';
+  document.getElementById('storage-list').innerHTML=items.length?listHtml:'<tr><td colspan="3" style="color:var(--text2)">暂无图像</td></tr>';
   var delBtns=document.getElementById('storage-list').querySelectorAll('.del-btn');
   for(var k=0;k<delBtns.length;k++){
     delBtns[k].onclick=function(){deleteImage(this.getAttribute('data-name'));};
@@ -319,7 +416,27 @@ async function runInference(){
 async function checkHealth(){
   var d=await api('/api/v1/system/health');
   var ok=d&&d.code===0;
-  document.getElementById('health').innerHTML='<span class=\"status-dot '+(ok?'online':'offline')+'\"></span>'+(ok?'系统在线':'离线');
+  document.getElementById('health').innerHTML='<span class="status-dot '+(ok?'online':'offline')+'"></span>'+(ok?'系统在线':'离线');
+}
+
+// === BANNER ===
+var lastAlert=null;
+function setBannerState(sev,text){
+  var el=document.getElementById('sys-state');
+  var ticker=document.getElementById('banner-ticker');
+  if(sev==='critical'||sev==='suspected_critical'){
+    el.className='sys-state alarm';
+    el.textContent='● 严重告警';
+    ticker.innerHTML='最新告警：<b>'+text+'</b>';
+  }else if(sev==='major'){
+    el.className='sys-state alarm';
+    el.textContent='● 告警';
+    ticker.innerHTML='最新告警：<b>'+text+'</b>';
+  }else{
+    el.className='sys-state normal';
+    el.textContent='● 系统正常';
+    ticker.textContent='最新告警：无';
+  }
 }
 
 // === WEBSOCKET ===
@@ -335,10 +452,11 @@ function connectWS(){
         var feed=document.getElementById('alert-feed');
         var item=document.createElement('div');
         item.className='alert-item '+(a.severity||'major');
-        item.innerHTML='<strong>'+(a.type||'ALERT').toUpperCase()+'</strong> | 设备: '+a.device_id+' | 置信度: '+(a.confidence||0).toFixed(2)+' | <span style=\"color:var(--text2)\">'+new Date().toLocaleTimeString()+'</span>';
+        item.innerHTML='<strong>'+(a.type||'ALERT').toUpperCase()+'</strong> | 设备: '+a.device_id+' | 置信度: '+(a.confidence||0).toFixed(2)+' | <span style="color:var(--text2)">'+new Date().toLocaleTimeString()+'</span>';
         if(feed.children[0]&&feed.children[0].tagName==='P') feed.innerHTML='';
         feed.insertBefore(item,feed.firstChild);
         if(feed.children.length>20) feed.removeChild(feed.lastChild);
+        setBannerState(a.severity,(a.type||'ALERT')+' · 设备 '+a.device_id);
       }
     }catch(ex){}
   };

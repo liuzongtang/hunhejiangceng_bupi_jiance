@@ -86,7 +86,7 @@ req = DetectionReportRequest(
     },
 )
 test("DetectionReportRequest", lambda: req.device_id)
-test("20 defect classes", lambda: len(TIANCHI_CLASS_NAMES))
+test("18 defect classes", lambda: len(TIANCHI_CLASS_NAMES))
 test("BW-01 mapping", lambda: DEFECT_CODES[DefectType.BROKEN_WARP].value)
 
 # 4. Services
@@ -98,7 +98,7 @@ a = svc.evaluate_defect(
     "broken_warp", "critical", "CAM-001", "B01", [0, 0, 10, 10], 0.96
 )
 test("Critical -> stop_machine", lambda: a.recommended_action == "stop_machine")
-b = svc.evaluate_defect("surface_mark", "minor", "CAM", "B", [0, 0, 1, 1], 0.5)
+b = svc.evaluate_defect("knot", "minor", "CAM", "B", [0, 0, 1, 1], 0.5)
 test("Minor -> no alert", lambda: b is None)
 
 # 5. Inference Engine

@@ -68,10 +68,11 @@ class DetectionService:
             sev = DEFECT_SEVERITY.get(dt, self._resolve_severity(severity))
             sev_value = sev.value
 
-            # Alert severity escalates visually-confusable lookalikes (e.g.
-            # surface_mark ~ broken_warp) so a critical defect mislabelled as a
-            # minor lookalike still raises an alarm. The stored severity stays
-            # canonical; the escalation is recorded separately for auditability.
+            # Alert severity may escalate a class to a visually-confusable
+            # higher-impact lookalike (CONFUSABLE_HIGHER_IMPACT). After the
+            # 2026-09-23 merge that map is empty, so this equals the canonical
+            # severity. The stored severity stays canonical; any escalation is
+            # recorded separately for auditability.
             alert_sev = effective_alert_severity(dt)
             alert_sev_value = alert_sev.value
             escalated_severity = alert_sev if alert_sev is not sev else None

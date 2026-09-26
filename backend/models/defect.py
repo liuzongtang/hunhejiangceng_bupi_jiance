@@ -52,9 +52,9 @@ class DefectRecord(Base):
         SAEnum(Severity, values_callable=_enum_values), nullable=False
     )
     # Alert-only escalation: set when the predicted class is visually confusable
-    # with a higher-impact class (e.g. surface_mark ~ broken_warp). ``severity``
-    # keeps the canonical class severity; this records the escalated level used
-    # to trigger the alarm so the escalation is auditable.
+    # with a higher-impact class (CONFUSABLE_HIGHER_IMPACT; empty after the
+    # 2026-09-23 merge). ``severity`` keeps the canonical class severity; this
+    # records the escalated level used to trigger the alarm so it is auditable.
     escalated_severity: Mapped[Optional[Severity]] = mapped_column(
         SAEnum(Severity, values_callable=_enum_values), nullable=True
     )

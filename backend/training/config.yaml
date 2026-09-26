@@ -8,7 +8,7 @@ training:
   weight_decay: 0.0001
   scheduler: cosine
   warmup_epochs: 5
-  num_classes: 20  # Tianchi smartdiagnosisofclothflaw 20 defect categories
+  num_classes: 18  # Tianchi 18 defect categories (2 confusable pairs merged)
 
   # Hybrid reward parameters
   hybrid_reward:

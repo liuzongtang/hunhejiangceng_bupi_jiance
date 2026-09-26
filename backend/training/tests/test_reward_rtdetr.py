@@ -25,8 +25,8 @@ class TestRewardRTDETRDetectionLoss:
     def _criterion(beta: float = 1.0) -> RewardRTDETRDetectionLoss:
         comp = DimensionRewardComputer(
             head_type="sigmoid",
-            broken_class_ids={9, 16},
-            skip_class_ids={15, 19},
+            broken_class_ids={9, 15},
+            skip_class_ids={14, 17},
         )
         return RewardRTDETRDetectionLoss(nc=20, reward_computer=comp, beta=beta)
 
@@ -72,7 +72,7 @@ class TestRewardRTDETRDetectionLoss:
     def test_include_misses_feeds_missed_critical_gt(self):
         """A missed critical GT gets a spare-query entry when include_misses=True."""
         comp = DimensionRewardComputer(
-            head_type="sigmoid", broken_class_ids={9, 16}, skip_class_ids={15, 19}
+            head_type="sigmoid", broken_class_ids={9, 15}, skip_class_ids={14, 17}
         )
         crit = RewardRTDETRDetectionLoss(
             nc=20,
@@ -99,7 +99,7 @@ class TestRewardRTDETRDetectionLoss:
     def test_include_misses_off_skips_spare_query(self):
         """Default (matched-only) never adds a spare-query miss entry."""
         comp = DimensionRewardComputer(
-            head_type="sigmoid", broken_class_ids={9, 16}, skip_class_ids={15, 19}
+            head_type="sigmoid", broken_class_ids={9, 15}, skip_class_ids={14, 17}
         )
         crit = RewardRTDETRDetectionLoss(
             nc=20, reward_computer=comp, beta=1.0, include_misses=False

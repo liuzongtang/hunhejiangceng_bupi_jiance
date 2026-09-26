@@ -111,7 +111,7 @@ class TestPostprocessing:
         assert det["confidence"] == pytest.approx(0.95, abs=0.01)
 
     def test_defect_code_mapping(self, pp):
-        """All 20 defect types should map correctly."""
+        """All 18 defect types should map correctly."""
         expected = {
             "hole": "HO-01",
             "stain": "ST-01",
@@ -124,14 +124,12 @@ class TestPostprocessing:
             "loose_warp": "LW-01",
             "broken_warp": "BW-01",
             "hanging_warp": "HW-01",
-            "coarse_weft": "CF-01",
             "weft_shrink": "WS-01",
             "size_stain": "ST-02",
             "warping_knot": "KN-02",
             "star_skip": "SK-01",
             "broken_spandex": "BS-01",
             "dense_section": "DS-01",
-            "surface_mark": "SM-01",
             "weave_defect": "WD-01",
         }
         for name, code in expected.items():
