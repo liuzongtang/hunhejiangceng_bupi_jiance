@@ -1,16 +1,16 @@
 # 论文骨架 · Paper Skeleton
 
-> **状态**：骨架 v0.1（plan mode 产物） · **语言**：中文正文 + 英文标题/摘要/图表标注
-> **篇幅**：本骨架 2–4 页，扩写目标 8–12 页（期刊式）
+> **状态**：骨架 v0.2（plan mode 产物 + 低置信度漏检诊断 & 七负消融） · **语言**：中文正文 + 英文标题/摘要/图表标注
+> **篇幅**：本骨架 3–5 页，扩写目标 8–12 页（期刊式）
 > **生成方式**：ARS `academic-paper` 方法论 · **引用状态**：3 篇同类对比已通过 arXiv/Crossref 核验（Semantic Scholar API 限流），其余待核验（IRON RULE：禁伪造文献）
-> **诚实边界**：所有数字均来自仓库内 `runs/rtdetr/*/results.csv` 与记忆库 A/B 记录，未达 0.90 目标即如实呈现，不以数据集替换虚报。
+> **诚实边界**：所有数字均来自仓库内 `runs/rtdetr*/*/results.csv` 与记忆库 A/B 记录，未达 0.90 目标即如实呈现，不以数据集替换虚报。
 
 ---
 
 ## 标题 Title
 
-- **中文**：七维混合奖惩驱动的织物瑕疵智能检测：RT-DETR 基线、标签噪声天花板与召回—精度权衡
-- **English**：Seven-Dimensional Hybrid Reward for Fabric Defect Detection: An RT-DETR Baseline, the Label-Noise Ceiling, and the Recall–Precision Trade-off
+- **中文**：七维混合奖惩驱动的织物瑕疵智能检测：RT-DETR 基线、标签噪声与低置信度漏检的双层天花板
+- **English**：Seven-Dimensional Hybrid Reward for Fabric Defect Detection: An RT-DETR Baseline and the Dual Ceiling of Label Noise and Low-Confidence Misses
 
 ---
 
@@ -24,9 +24,9 @@
 
 **Method** — We train an RT-DETR-L baseline on the Tianchi fabric-defect benchmark (18 merged classes), then inject a differentiable seven-dimensional hybrid reward (D01 localization, D02 classification, D03 calibration, D04 miss, D05 false-positive, D06 broken-yarn sensitivity, D07 skip/weave sensitivity) into the detection loss. We further apply a label-noise ceiling diagnosis — confusion-matrix analysis, bidirectionality test, and cropped-image review — that merges visually identical class pairs.
 
-**Findings** — The baseline reaches mAP50 = 0.594 (20-class) / 0.541 (18-class). Reward injection raises overall recall by +0.030 (0.523→0.553) but lowers precision by 0.022 with flat mAP50, exposing a recall–precision zero-sum boundary. Merging confusable classes recovers recall sharply: weft_shrink+coarse_weft 0.40→0.88, broken_warp+surface_mark 0.52→0.79.
+**Findings** — The baseline reaches mAP50 = 0.594 (20-class) / 0.541 (18-class). A two-level diagnosis exposes the ceiling. *Level 1 — label noise*: merging confusable class pairs recovers recall sharply (weft_shrink+coarse_weft 0.40→0.88, broken_warp+surface_mark 0.52→0.79). *Level 2 — low-confidence misses*: after the merge, the critical classes (hole / broken_warp / broken_spandex) are *missed below threshold*, not misclassified (broken_spandex: 0 misclassified vs. 133 missed); lowering the confidence threshold lifts critical recall 0.57→0.91 but collapses precision (broken_warp 0.56→0.08), so true and false detections are inseparable by confidence. Seven training-signal interventions — differentiable reward injection, GRPO, classification severity weighting (4 arms), box-loss weighting, and a Normalized-Wasserstein-Distance loss geometry — all fail to beat a uniform fine-tune control on critical recall.
 
-**Implications** — The dominant bottleneck is label noise, not the training signal; the diagnosis pipeline (confusion matrix → bidirectionality → crop review) is a transferable methodology for fine-grained, long-tail recognition tasks.
+**Implications** — The bottleneck is not the training signal but the feature-level discriminability of thin defects: their low confidence faithfully reflects hard localization, not mis-calibration (consistent with the DETR "specialist strategy" of one-to-one matching). The diagnosis — confusion matrix → threshold calibration → systematic ablation — is a transferable methodology for cost-sensitive, fine-grained recognition.
 
 **Keywords**: fabric defect detection; RT-DETR; hybrid reward; label noise; recall–precision trade-off; GRPO
 
@@ -38,9 +38,9 @@
 
 **研究方法** — 在 Tianchi 布匹疵点基准（合并后 18 类）上训练 RT-DETR-L 基线，将可微的七维混合奖惩（D01 定位、D02 分类、D03 校准、D04 漏检、D05 误检、D06 断经/断氨纶敏感度、D07 星跳/死皱敏感度）注入检测损失；进一步采用标签噪声天花板诊断（混淆矩阵 + 双向性判定 + 裁剪图复核）合并视觉同源类。
 
-**研究发现** — 基线达到 mAP50 = 0.594（20 类）/ 0.541（18 类）；奖励注入使整体召回率 +0.030（0.523→0.553），但精确率下降 0.022、mAP50 持平，精确暴露"召回—精度"零和边界；合并易混淆类后召回率显著回升：纬缩+粗纬 0.40→0.88、断经+磨痕 0.52→0.79。
+**研究发现** — 基线达到 mAP50 = 0.594（20 类）/ 0.541（18 类）。双层诊断揭示天花板：第一层为标签噪声——合并视觉同源类后召回显著回升（纬缩+粗纬 0.40→0.88、断经+磨痕 0.52→0.79）；第二层为低置信度漏检——合并后关键类（破洞/断经/断氨纶）是"低于阈值漏检"而非"错分"（断氨纶 0 错分、133 漏检），降低置信度阈值可将关键类召回 0.57→0.91，但精确率崩塌（断经 0.56→0.08），真检与误检无法按置信度分离。七种训练信号干预——可微奖励注入、GRPO、分类严重度加权（4 臂）、box 损失加权、以及 NWD 损失几何——均未能超越均匀微调对照。
 
-**研究意义** — 证明当前瓶颈在数据标签层而非训练信号；"混淆矩阵→双向性→裁剪复核"诊断流程对同类细粒度长尾识别任务具有可迁移的方法论价值。
+**研究意义** — 证明瓶颈不在训练信号，而在细缺陷的特征级判别力：低置信度是困难定位的忠实反映而非校准失误（与一对一匹配的"专家策略"一致）；"混淆矩阵→阈值标定→系统消融"诊断流程对成本敏感型细粒度识别任务具有可迁移的方法论价值。
 
 **关键词**：织物瑕疵检测；RT-DETR；混合奖惩；标签噪声；召回—精度权衡；GRPO
 
@@ -166,11 +166,64 @@
   | 纬缩 ∪ 粗纬 | 0.40（纬缩） | 0.79（粗纬） | **0.88** |
   | 断经 ∪ 磨痕 | 0.52（断经） | 0.83（磨痕） | **0.79** |
 
-#### 4.5 消融与评估口径（A+B 诚实口径）
+#### 4.5 低置信度漏检诊断（混淆矩阵 + 阈值标定）
+
+合并后关键类召回仍停滞在 0.48–0.72（hole 0.718 / broken_warp 0.521 / broken_spandex 0.484）。为定位根因，对 18 类基线做两层诊断：
+
+**（一）混淆矩阵——漏检而非错分。** val 957 张、conf=0.25 下，关键类的正确/漏检/错分分解：
+
+- **表 4　关键类混淆矩阵分解（行=真值，idx 18=背景）**
+
+  | 类 | 正确 | 漏检(背景) | 错分 | 主要混淆（←计数） |
+  |---|---|---|---|---|
+  | hole | 27 | 31 | 3 | knot←3 |
+  | broken_warp | 17 | 151 | 26 | loose_warp←12, hanging_warp←5, weave_defect←4 |
+  | broken_spandex | 45 | 133 | **0** | （无） |
+
+- 关键结论：**断氨纶 0 错分**——模型不混淆这些类，只是**检不到阈值之上**。样本量排除稀有度假设（hole=273 / broken_warp=681 / broken_spandex=492 为中频，真正的长尾是 flower_board=117、hundred_feet=145）。
+- 与 `box.r`（max-F1 召回 0.718/0.521/0.484 ≫ conf-0.25 召回 0.44/0.09/0.25）的对账说明：缺陷**被某些 query 检出但置信度 < 0.25**，即"漏检 = 低于任何可用全局阈值"——是**校准/置信度**问题，不是检测/分类问题。
+
+**（二）阈值标定——召回可抬但精确率崩塌。** 在逐类 P/R 曲线上扫置信度：
+
+- **表 5　成本敏感关键类召回（三种阈值口径，均值 hole/broken_warp/broken_spandex）**
+
+  | 口径 | 阈值 | crit_recall | broken_warp P | broken_spandex P |
+  |---|---|---|---|---|
+  | 全局 max-F1 | conf=0.473 | 0.573 | 0.56 | 0.49 |
+  | 逐类 max-F1 | 各类自优 | 0.593 | — | — |
+  | 召回优先 | conf=0.10 | **0.910** | **0.08** | **0.10** |
+
+- 关键结论：**不存在「高召回 + 可用精确率」的阈值**——降阈值可把关键类召回 0.57→0.91，但 broken_warp 精确率 0.56→0.08、broken_spandex 0.49→0.10，真低置信检测与误报无法按置信度分离。
+- 根因：RT-DETR 的 VarifocalLoss `gt_score` == 预测 IoU，故"低置信度" == "细缺陷定位自评弱"（断经/断氨纶纱线、小洞等细长弱对比目标）。
+
+#### 4.6 训练信号干预的系统消融（七负）
+
+针对上述根因，对**训练信号**做了七种干预（奖励注入、奖励塑形、分类加权、定位加权、定位度量），全部以严格 A/B 对照验证：
+
+- **表 6　训练信号干预系统消融（关键类召回 @ max-F1）**
+
+  | # | 干预 | 机制层 | 关键指标 | 对照均匀微调 | 判定 |
+  |---|---|---|---|---|---|
+  | 1 | Layer-1 可微奖励注入（β=0.5） | 奖励 | 整体召回 +0.030，broken_spandex −0.100 | — | 负 |
+  | 2 | Layer-3 GRPO（β=0.5，3ep） | 奖励 | crit_recall 0.574→0.344 | — | 负 |
+  | 3 | Direction B 分类严重度加权（4 臂） | 分类损失 | full 0.541 / positive-only 0.591 | < 0.606 | 负 |
+  | 4 | R2 box 加权（critical 2.0×） | 定位损失权重 | crit_recall 0.598，mAP50 0.522 | < 0.606 | 负 |
+  | 5 | R3 NWD 损失几何 | 定位损失度量 | crit_recall 0.598，mAP50 0.518 | < 0.606 | 负 |
+
+- 逐条结论：
+  1. **Layer-1**：漏检纳入奖励使整体召回 +0.030，但最常见关键类 broken_spandex −0.100、mAP50 持平（20 类模型，见 4.3）。
+  2. **Layer-3 GRPO**：β=0.5 三 epoch 使 crit_recall 0.574→0.344（std_reward≈1e-4 使 REINFORCE 失效、log_std→−4.78、均值梯度劣化模型）。
+  3. **Direction B**：分类项严重度加权 4 臂中，full-term 0.541、positive-only 0.591 **均不敌**均匀微调 0.606（positive-only 只是部分修复 full-term 的误检过抑制）。
+  4. **R2**：把 box 臂（L1+GIoU）按被匹配 query 的目标类严重度加权，crit_recall 0.598 仍 < 均匀 0.606。
+  5. **R3**：把 box 损失从 IoU/GIoU **换成** NWD（高斯化 Wasserstein，理论上最适细目标），并把 varifocal `gt_score` 的 IoU 一并换为 NWD，crit_recall 0.598 仍 < 均匀 0.606。
+- **阈值标定复查（R2/R3 的最终判据）**：R2/R3 训练后的关键类在降阈值时精确率**原封不动崩塌**——broken_warp P@conf0.10 = 0.081（R2）/ 0.082（R3）vs 基线 0.08，broken_spandex P@0.10 = 0.080（R2）/ 0.053（R3）vs 基线 0.10。即**改权重、改度量都未能把真检测的置信度相对误报抬起来**。
+- **统一解释（接口错位）**：七维奖惩中 D01 定位 / D03 校准 / D04 漏检三个维度**命中**了故障，但它们的接口形式（聚合 box 指标 / 分类损失梯度）与真实故障层（query 触发 + 定位自评）**不对齐**，故梯度无从着力。更深一层：低置信度是**忠实的低判别力**，与 DETR 一对一匹配的"专家策略"一致——每个目标只有一个"主预测" query，其置信度被训练为自身预测 IoU，而细缺陷的 IoU 天然低且无第二个 query 兜底。
+
+#### 4.7 消融与评估口径（A+B 诚实口径）
 - **A（主指标）**：关键类（断经/断氨纶/破洞）召回率 ≥ 0.85（当前基线值待补）+ 全局 mAP50 诚实值 0.54–0.59。
 - **B（系统级）**：有无瑕疵二分类检测准确率/召回（目标 ≥ 0.90，待实验）。
 
-#### 4.6 与同类方法对比
+#### 4.8 与同类方法对比
 - **方法学对比（本项目 vs 传统检测器 vs 朴素奖励/类加权）**：
   | 对比维度 | 本项目 | 传统 YOLO 类检测器 | 朴素奖励 / 类加权 |
   |---|---|---|---|
@@ -201,16 +254,18 @@
 
 ### 5 讨论 Discussion
 
-- **核心论点**：数据/标签噪声是当前天花板，而非训练信号或模型容量。
+- **核心论点**：天花板有两层——第一层标签噪声（可修复，类合并）；第二层细缺陷低置信度漏检（七种训练信号干预均无法修复，故障在特征级判别力）。
 - **要点**：
-  - 召回—精度零和边界：奖励只能"搬移"指标，不能"新增"可分性。
+  - 召回—精度零和边界：奖励只能"搬移"指标，不能"新增"可分性（Layer-1）。
   - 标签污染 vs 标注歧义两类混淆的区分（断经↔磨痕 = 标签污染；纬缩↔粗纬 = 标注歧义）。
-  - 对工业部署的启示：severity 驱动的分级告警（critical→停机、major→标记）比全局 mAP 更贴近真实代价。
+  - 低置信度漏检的**接口错位**解释：七维奖惩的 D01/D03/D04 命中故障，但接口（聚合 box 指标 / 分类损失梯度）与真实故障层（query 触发 + 定位自评）不对齐；更深层是 DETR"专家策略"下的忠实低判别力——每个目标仅一个"主预测" query，其置信度被训练为自身预测 IoU，细缺陷 IoU 天然低且无第二 query 兜底。
+  - 三个可写进论文的发现：① **度量不公平**（全局 vs 逐类 max-F1 阈值相差 ~0.02 召回）；② **逐类标定缺失**（各类最优阈值差异大，无统一背景分）；③ **漏检奖励的匹配层盲区**。
+  - 对工业部署的启示：severity 驱动的分级告警（critical→停机、major→标记）+ **逐类成本敏感阈值**（召回 0.90 可达，误报洪水需人工复核，符合"漏检代价 ≫ 误检代价"）比全局 mAP 更贴近真实代价。
 
 ### 6 结论与展望 Conclusion & Future Work
 
-- **结论**：① 七维可微奖励确能驱动关键类召回倾斜；② 标签噪声天花板是主瓶颈；③ 诊断方法论可迁移。
-- **展望**：① GRPO（Layer-3）完整训练闭环；② 关键类重标注/主动学习突破标签天花板；③ ONNX 边缘部署 + 分级告警系统化评估。
+- **结论**：① 七维可微奖励确能驱动关键类召回倾斜，但呈召回—精度零和；② 天花板有两层——标签噪声（类合并可修复）与细缺陷低置信度漏检（七种训练信号干预均无法修复，故障在特征级判别力而非损失/奖励）；③ 双层诊断方法论可迁移（混淆矩阵→阈值标定→系统消融）。
+- **展望**：① 特征层干预（SPDConv space-to-depth / AIFF 内可变形注意力，保留细缺陷特征，文献证据 +3.5% mAP50）；② 标定层（objectness/背景头，同时解决 B 口径与专家策略的"主预测不可识别"）；③ 部署层逐类成本敏感阈值（当前唯一干净正结果）；④ 关键类重标注/主动学习突破标签天花板；⑤ ONNX 边缘部署 + 分级告警系统化评估。
 
 ---
 
@@ -221,10 +276,14 @@
 | 图 1 | 技术路线图 | 五阶段 pipeline 总览 | 已出图 |
 | 图 2 | 训练曲线 | mAP50 / Precision / Recall vs epoch（tianchi18_full, 60ep） | 已出图 |
 | 图 3 | A/B 对比 | 奖励注入：召回+0.030 / 精确−0.022 / mAP50 +0.004 + 关键类召回 | 已出图 |
+| 图 4 | 阈值标定 | 关键类 P/R 曲线随置信度扫（召回 0.57→0.91、精确率崩塌） | 待出图 |
 | 表 1 | 维度表 | D01–D07 定义/可微构造/工业语义 | 已填 |
 | 表 2 | 类别表 | 18 类中英名 + 严重度 | 已填（样本量待统计） |
 | 表 3 | 合并对照 | 混淆类合并前后召回 | 已填 |
-| 表 4 | 同类对比 | 方法学对比 + 内部 A/B 量化 + 外部 3 篇核验 | 已填（外部 3 篇核验） |
+| 表 4 | 混淆矩阵 | 关键类正确/漏检/错分分解（漏检非错分） | 已填 |
+| 表 5 | 阈值标定 | 三种阈值口径 crit_recall + 关键类精确率 | 已填 |
+| 表 6 | 七负消融 | 七种训练信号干预的 crit_recall 对照 | 已填 |
+| 表 7 | 同类对比 | 方法学对比 + 内部 A/B 量化 + 外部 3 篇核验 | 已填（外部 3 篇核验） |
 
 ---
 
@@ -244,6 +303,8 @@
 10. ✅ Zhao P., Jia S., *SPFFNet: Strip Perception and Feature Fusion Spatial Pyramid Pooling for Fabric Defect Detection*，arXiv:2502.01445（Tianchi 20 类，mAP50 65.8%）.
 11. ✅ Wang S., Kong H., Li B., Zheng F., *Fab-ME: A Vision State-Space and Attention-Enhanced Framework for Fabric Defect Detection*，arXiv:2412.03200 / Springer LNCS (ICIC 2025) 15854:103–114，DOI 10.1007/978-981-96-9901-8_9（Tianchi 20 类，mAP50 59.4%）.
 12. ✅ Liang G., Han S., *Denim fabric defect detection algorithm based on improved RT-DETR*，浙江大学学报（工学版）2025, 59(6):1169–1178，DOI 10.3785/j.issn.1008-973X.2025.06.008（Tianchi，mAP50 60.0%）.
+13. ✅ Park Y.-J., Sobolewski C., Azizan N., *Uncertainty Quantification in Detection Transformers: Object-Level Calibration and Image-Level Reliability*，arXiv:2412.01782（DETR 一对一匹配的"专家策略"与对象级标定误差 OCE）.
+14. ⏳ Wang J., Xu C., Yang W., Yu L., *A Normalized Gaussian Wasserstein Distance for Tiny Object Detection*，AAAI 2022（细目标 IoU 敏感性的 NWD 替代，arXiv ID 待核验）.
 
 ---
 
@@ -261,4 +322,11 @@
 | 关键类召回变化 | broken_warp +0.032 / star_skip +0.057 / weave_defect +0.128 / broken_spandex −0.100 | Layer-1 A/B |
 | 合并召回回升 | 纬缩+粗纬 0.40→0.88；断经+磨痕 0.52→0.79 | 类合并 |
 | 类别数 | 20 → 18（合并 2 组同源类） | data.yaml nc=18 |
+| 关键类 max-F1 召回（18 类基线） | hole 0.718 / broken_warp 0.521 / broken_spandex 0.484 | tianchi18_full |
+| 关键类混淆分解（conf 0.25） | broken_spandex 0 错分/133 漏检；broken_warp 17 正/151 漏/26 错分 | 混淆矩阵 |
+| 关键类实例数 | hole 273 / broken_warp 681 / broken_spandex 492（中频非长尾） | 逐类统计 |
+| 阈值标定 crit_recall | 0.573（全局 max-F1）/ 0.593（逐类）/ 0.910（conf 0.10） | eval_threshold_calibration |
+| 精确率崩塌（conf 0.10） | broken_warp 0.56→0.08；broken_spandex 0.49→0.10 | eval_threshold_calibration |
+| 均匀微调 crit_recall | **0.606**（所有加权干预的上界） | Direction B uniform 5ep |
+| 七负消融 crit_recall | GRPO 0.344 / 分类加权 0.591 / box 加权 0.598 / NWD 0.598 | 各干预 5ep |
 | 训练稳定性 | fp16 AMP 溢出 → `amp=False` 修复，0 NaN | 工程发现 |
