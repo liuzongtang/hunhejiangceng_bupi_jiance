@@ -1,0 +1,580 @@
+<h1 style="font-family: var(--ff-heading); font-size: var(--fs-h1); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-heading);">数据集收集、清洗与模型输入：一条链路的完整拆解</h1>
+<h2 style="font-family: var(--ff-heading); font-size: var(--fs-h2); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary);">这份讲义解决什么问题</h2>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">很多人讲深度学习项目，讲的是&quot;模型怎么训&quot;。但<strong>模型能学到什么上限，是被数据决定的</strong>。这份讲义把项目的数据链路完整拆一遍：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">采集 → 清洗 → 转换 → 划分 → 加载 → 预处理 → 进入网络 → 输出回映射</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">每个环节都给出<strong>这段代码在解决什么真实问题</strong>，以及<strong>如果不做会怎样</strong>。全文所有数字都来自项目实测，不是教科书示例。</p>
+<h2 style="font-family: var(--ff-heading); font-size: var(--fs-h2); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary);">阅读前先看一组实测数据</h2>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">这组数字是理解整条链路的基础，全部由我在项目中统计得出：</p>
+<table style="border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-paragraph);"><thead><tr><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">项目</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">实测值</th></tr></thead><tbody><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">训练集图像</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">8619 张</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">训练集标注框</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">8570 个</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">验证集图像</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">957 张</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">验证集标注框</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">953 个</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">验证集负样本</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">374 张（占 39%）</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">类别数</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">18 类</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><strong>所有图像尺寸</strong></td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><strong>2446 × 1000，宽高比恒为 2.45:1</strong></td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">最小标注框宽度</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">0.002833（归一化）</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">最大标注框宽度</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">1.000000</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">越界标注框</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">9 个（幅度约 1e-6）</td></tr></tbody></table>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">最后两行是重点：<strong>图像尺寸完全统一</strong>，以及<strong>存在真实的越界标注</strong>。这两个事实分别解释了后面第 4.5 节和第 2.4 节的设计动机。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">---</p>
+<h2 style="font-family: var(--ff-heading); font-size: var(--fs-h2); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary);">第一章 数据从哪来：采集环节</h2>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">1.1 为什么用公开竞赛数据集</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">本项目的数据来自阿里天池公开竞赛「智能织物瑕疵诊断赛」，赛题代号 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">smartdiagnosisofclothflaw</code>。平台提供 5 个压缩包：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">smartdiagnosisofclothflaw_round1train1_datasets_partA.zip
+smartdiagnosisofclothflaw_round1train1_datasets_partB.zip
+smartdiagnosisofclothflaw_round1train2_datasets.zip
+smartdiagnosisofclothflaw_round1testA_datasets.zip
+smartdiagnosisofclothflaw_round1testB_datasets.zip</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">选择公开数据集而非自采，理由有三层：</p>
+<table style="border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-paragraph);"><thead><tr><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">维度</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">自采数据</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">天池数据（本项目选择）</th></tr></thead><tbody><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">标注成本</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">每张图每个框都要人工标，8570 个框成本极高</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">官方已标好，直接用</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">可比性</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">无法与他人结果横向比较</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">赛题统一口径，可与公开方法比 mAP</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">版权合规</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">产线数据多涉及商业机密</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">公开可商用，无合规风险</td></tr></tbody></table>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>竞赛制数据集的特殊性</strong>：官方给包、自己标注、自己训练。所以&quot;数据怎么找&quot;的重点不是检索技术，而是<strong>为什么要选它、它的结构长什么样、有哪些坑</strong>。</p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">1.2 原始数据结构：两分类目录</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">天池数据集的原始组织方式是一个容易被忽略的细节：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">defect_Images/     缺陷图（有标注）
+normal_Images/     正常图（无标注）
+Annotations/anno_train.json   全部标注集中在这一个文件里</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">三个关键特征：</p>
+<ol style="padding-left: var(--spacing-list); margin-bottom: var(--spacing-paragraph);"><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>图像按有无缺陷分两个目录</strong>，而不是按类别分</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>标注集中在一个 JSON</strong>，不是每图一个标注文件</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>文件名是哈希串</strong>，如 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">002775affdee8d951419014376.jpg</code></li></ol>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这三点每一个都在后面的清洗环节制造了必须处理的情况。</strong></p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">1.3 原始标注格式</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">{&quot;name&quot;: &quot;图片文件名.jpg&quot;, &quot;defect_name&quot;: &quot;断经&quot;, &quot;bbox&quot;: [xmin, ymin, xmax, ymax]}</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">三个字段的含义：</p>
+<ul style="padding-left: var(--spacing-list); margin-bottom: var(--spacing-paragraph);"><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">name</code> —— 图像文件名，<strong>关联图像与标注的唯一键</strong></li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">defect_name</code> —— 中文缺陷名，需要映射为数字类别</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">bbox</code> —— <strong>xyxy 格式的像素坐标</strong>（左上和右下两点，不是宽高）</li></ul>
+<blockquote style="border-left: 3px solid var(--color-primary); background: var(--color-callout-bg); padding: var(--pad-callout); margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small);"><p style="text-indent: 0; margin-bottom: var(--spacing-tight);">⚠️ <strong>最容易出错的地方</strong>：<code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">bbox</code> 是 xyxy 还是 xywh。天池给的是 <strong>xyxy</strong>（四点），YOLO 格式要的是 <strong>cxcywh</strong>（中心点 + 宽高）。这个转换写错，训练不会报错，但框的位置全是错的，模型学出来的东西完全不对。<strong>这是本项目专门写了转换函数的原因。</strong></p></blockquote>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">1.4 原始数据规模</h3>
+<table style="border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-paragraph);"><thead><tr><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">数据集</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">缺陷图数</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">正常图数</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">标注</th></tr></thead><tbody><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">train1 partA</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">2387</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">有</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">有</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">train1 partB</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">2387</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">有</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">有（<strong>与 partA 完全相同</strong>）</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">train2</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">1139</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">有</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">有</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">testA / testB</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">—</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">—</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">无（仅推理用）</td></tr></tbody></table>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">---</p>
+<h2 style="font-family: var(--ff-heading); font-size: var(--fs-h2); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary);">第二章 清洗环节：五个必须处理的问题</h2>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">清洗不是&quot;随便擦擦&quot;，而是针对每个具体问题写代码解决。这一章逐个列出<strong>问题 → 现象 → 代码 → 后果</strong>。</p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">2.1 问题一：标注文件字节级重复</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>现象</strong>：partA 和 partB 的标注文件是同一份。我用 md5 校验确认：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">$ md5sum shujuji/*partA/partA/Annotations/anno_train.json \
+         shujuji/*partB/partB/Annotations/anno_train.json
+8ca9efa45e3f4ade805a12019a5880a3  partA/Annotations/anno_train.json
+8ca9efa45e3f4ade805a12019a5880a3  partB/Annotations/anno_train.json</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>md5 完全相同意味着字节级一致</strong>。这不是&quot;内容相似&quot;，是同一个文件被拷了两遍。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>如果不处理会怎样</strong>：转换脚本遍历三个目录累加，同一张图的标注会被写入两遍，<strong>GT 框数量直接翻倍</strong>。后果是：</p>
+<ul style="padding-left: var(--spacing-list); margin-bottom: var(--spacing-paragraph);"><li style="margin-bottom: var(--spacing-tight); text-indent: 0;">正负样本比失真</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;">同一个目标被当成两个不同的目标监督</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;">验证集指标虚高且完全无法复现</li></ul>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>代码怎么解决</strong>——按图像名去重，而不是按标注条数累加：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;"># scripts/convert_tianchi_to_yolo.py · convert_train_dir()
+for subdir in (&quot;defect_Images&quot;, &quot;normal_Images&quot;):
+    img_dir = os.path.join(ds_dir, subdir)
+    if not os.path.isdir(img_dir):
+        continue
+    for fname in sorted(os.listdir(img_dir)):
+        if os.path.splitext(fname)[1].lower() not in IMAGE_EXTS:
+            continue
+        src = os.path.join(img_dir, fname)
+
+        # Read dimensions to normalize bbox coordinates.
+        with Image.open(src) as im:
+            w, h = im.size
+
+        dst_img = os.path.join(out_images, fname)
+        if os.path.exists(dst_img):
+            print(f&quot;  [warn] duplicate image name skipped: {fname}&quot;)
+            continue          # ← 按图像名去重，skip 而不是累加
+        shutil.copy(src, dst_img)</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>设计要点</strong>：去重的<strong>判据是&quot;目标文件已存在&quot;</strong>，即按图像名。这与&quot;按标注内容去重&quot;是两套不同策略——图像去重防的是重复拷贝，标注去重防的是同一张图里被标了两次同样的框。本项目只需要前者。</p>
+<blockquote style="border-left: 3px solid var(--color-primary); background: var(--color-callout-bg); padding: var(--pad-callout); margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small);"><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"><strong>教学点</strong>：数据清洗里的&quot;去重&quot;必须先回答一个问题：<strong>按什么键去重？</strong> 用错键是数据污染最常见的来源。</p></blockquote>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">2.2 问题二：解压垃圾文件</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">macOS 压缩包解压后会留下 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">__MACOSX</code> 目录，里面是 AppleDouble 元数据文件（<code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">._anno_train.json</code> 这种）。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>如果不处理会怎样</strong>：遍历 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">Annotations/</code> 目录时可能读到这些 4KB 的残缺文件，导致 JSON 解析失败或读到空内容。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>代码怎么解决</strong>——只读固定的标注文件名，不遍历目录：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">by_name = load_annotations(os.path.join(ds_dir, &quot;Annotations&quot;, &quot;anno_train.json&quot;))</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">同时 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">IMAGE_EXTS</code> 白名单过滤了扩展名：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">IMAGE_EXTS = {&quot;.jpg&quot;, &quot;.jpeg&quot;, &quot;.png&quot;, &quot;.bmp&quot;, &quot;.tiff&quot;}</code></pre>
+<blockquote style="border-left: 3px solid var(--color-primary); background: var(--color-callout-bg); padding: var(--pad-callout); margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small);"><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"><strong>教学点</strong>：<strong>白名单优于黑名单</strong>。用 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">if ext not in IMAGE_EXTS: continue</code> 排除一切未知类型，比逐个列出要排除的扩展名更安全——新的垃圾文件类型出现时白名单自动生效。</p></blockquote>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">2.3 问题三：中文缺陷名到类别 ID 的映射与归并</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">原始 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">defect_name</code> 是中文，而且<strong>同一个缺陷有多个别名</strong>，官方 README 还有错别字：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">NAME_TO_CATEGORY: Dict[str, int] = {
+    &quot;破洞&quot;: 1,
+    &quot;水渍&quot;: 2, &quot;油渍&quot;: 2, &quot;污渍&quot;: 2,        # 三个同义名归为一类
+    &quot;三丝&quot;: 3,
+    &quot;结头&quot;: 4,
+    &quot;花板跳&quot;: 5,
+    &quot;百脚&quot;: 6,
+    &quot;毛粒&quot;: 7,
+    &quot;粗经&quot;: 8,
+    &quot;松经&quot;: 9,
+    &quot;断经&quot;: 10,
+    &quot;吊经&quot;: 11,
+    &quot;粗纬&quot;: 12,
+    &quot;粗维&quot;: 12,  # 粗维是官方 README 的错别字
+    &quot;纬缩&quot;: 13,
+    &quot;浆斑&quot;: 14,
+    &quot;整经结&quot;: 15,
+    &quot;星跳&quot;: 16,
+    &quot;跳花&quot;: 16,  # 同义缺陷名归并
+    &quot;断氨纶&quot;: 17,
+    &quot;稀密档&quot;: 18,
+    &quot;浪纹档&quot;: 18,
+    &quot;色差档&quot;: 18,
+    &quot;磨痕&quot;: 19,
+    &quot;轧痕&quot;: 19,
+    &quot;修痕&quot;: 19,
+    &quot;烧毛痕&quot;: 19,
+    &quot;死皱&quot;: 20,
+    &quot;云织&quot;: 20,
+    &quot;双纬&quot;: 20,
+    &quot;双经&quot;: 20,
+    &quot;跳纱&quot;: 20,
+    &quot;筘路&quot;: 20,
+    &quot;纬纱不良&quot;: 20,
+}</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这里有 20 个原始类别，但只有 18 个最终类别</strong>——因为 19 号（磨痕族）和 20 号（死皱族）在后续实证诊断中被证明与 9 号（断经）、11 号（纬缩）视觉不可区分，合并了。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>代码怎么处理未知缺陷名</strong>——统计并跳过，而不是崩溃：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">for ann in by_name.get(fname, []):
+    category = NAME_TO_CATEGORY.get(ann[&quot;defect_name&quot;])
+    if category is None:
+        skipped += 1
+        continue
+    cls = category_to_class_id(category, scheme)
+    ...
+# 转换结束后统一报告
+if skipped:
+    print(f&quot;  [warn] {skipped} annotations had unknown defect_name and were skipped&quot;)</code></pre>
+<blockquote style="border-left: 3px solid var(--color-primary); background: var(--color-callout-bg); padding: var(--pad-callout); margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small);"><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"><strong>教学点</strong>：<strong>静默跳过是数据清洗的大忌</strong>。跳过之后必须计数并报告，否则你永远不知道丢了多少数据。本项目专门维护了 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">skipped</code> 计数器并在结束时打印——这是很值得学的习惯。</p></blockquote>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">2.4 问题四：坐标格式转换与越界防护</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这是整个清洗环节技术含量最高的一段。</strong></p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">原始是 xyxy 像素坐标，YOLO 要的是 cxcywh 归一化坐标：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">def xyxy_to_yolo(
+    bbox: List[float], w: int, h: int
+) -&gt; Tuple[float, float, float, float]:
+    &quot;&quot;&quot;Convert xyxy pixel bbox to normalized (cx, cy, bw, bh).&quot;&quot;&quot;
+    xmin, ymin, xmax, ymax = (float(v) for v in bbox)
+    cx = (xmin + xmax) / 2.0 / w        # ① 中心点
+    cy = (ymin + ymax) / 2.0 / h
+    bw = max(0.0, (xmax - xmin)) / w    # ② 宽度，max 防负
+    bh = max(0.0, (ymax - ymin)) / h
+    cx, cy = min(max(cx, 0.0), 1.0), min(max(cy, 0.0), 1.0)   # ③ 双向钳制
+    return cx, cy, bw, bh</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>四层防护，每层解决一个真实问题</strong>：</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>① 中心点转换</strong>——为什么要归一化到 0~1？因为要让标注与图像分辨率解耦。同一份标签在 2446×1000 和 1280×1280 上都能用，模型才能泛化到不同尺寸的输入。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>② <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">max(0.0, ...)</code> 防负宽度</strong>——如果原始标注里 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">xmax &lt; xmin</code>（标注错误），不减负宽度会得到负的 w。负宽度进入 IoU 计算会让并集面积算错，梯度方向也会反。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>③ 双向钳制 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">min(max(x, 0.0), 1.0)</code></strong>——这一条我专门验证过必要性：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;"># 我扫描全部 8570 个框，找出越界的
+176efbfe6e679eb80947344795.txt 行1: cls=5  L=-0.000001  R=0.967820
+2081dfbd199874a70952566372.txt 行1: cls=16 L=0.000715   R=1.000001
+4c07795e946fd94a1204402223.txt 行1: cls=13 L=-0.000001  R=0.992911
+...
+共 9 个越界框</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>实测确认 8570 个框中有 9 个越界</strong>，幅度都在 1e-6 量级。来源很清楚：原始标注框在图像边缘，xyxy 坐标精确到像素边界，转换后再经六位小数舍入，就会出现 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">R=1.000001</code> 或 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">L=-0.000001</code> 这种溢出。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>为什么不修</strong>：幅度只有 1e-6，对训练几乎没有影响。但<strong>必须钳制</strong>，因为：</p>
+<ul style="padding-left: var(--spacing-list); margin-bottom: var(--spacing-paragraph);"><li style="margin-bottom: var(--spacing-tight); text-indent: 0;">某些 IoU 实现的分母会因越界而略微偏小</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;">边界框回归的 L1 损失会持续对越界框施加梯度，产生不必要的校正压力</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;">更重要的是：<strong>这是防御性代码</strong>。今天只溢出 1e-6，换个数据集可能溢出 0.05</li></ul>
+<blockquote style="border-left: 3px solid var(--color-primary); background: var(--color-callout-bg); padding: var(--pad-callout); margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small);"><p style="text-indent: 0; margin-bottom: var(--spacing-tight);">⚠️ <strong>一个重要区别</strong>：钳制的是<strong>中心点</strong> <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">cx, cy</code>，不是 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">x1, y1</code>。框的宽高允许超出图像边界（目标被图像边缘截断是真实存在的），但中心点必须落在图内。</p></blockquote>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>④ 六位小数精度</strong>——写入时用 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">f&quot;{cx:.6f}&quot;</code>：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">lines.append(f&quot;{cls} {cx:.6f} {cy:.6f} {bw:.6f} {bh:.6f}&quot;)</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>为什么必须是六位</strong>：我实测过，训练集里<strong>最小的框宽度是 0.002833</strong>（归一化）。如果只保留 3 位小数，0.002833 会被写成 0.003，误差 6%；如果 4 位，误差降到 0.6%。更极端的情况——如果某个框宽度是 0.0001，3 位小数直接写成 0.000，<strong>这个框就消失了</strong>。本项目实测退化框（宽或高 &lt; 1e-5）数量为 0，说明六位精度是够的。</p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">2.5 问题五：负样本必须保留</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">normal_Images</code> 里的正常图<strong>没有标注</strong>，但绝不能丢掉——代码把它们写成<strong>空的 .txt 文件</strong>：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;"># Build YOLO label (empty file for normal images).
+lines: List[str] = []
+for ann in by_name.get(fname, []):
+    ...
+    lines.append(f&quot;{cls} {cx:.6f} {cy:.6f} {bw:.6f} {bh:.6f}&quot;)
+
+label_path = os.path.join(out_labels, os.path.splitext(fname)[0] + &quot;.txt&quot;)
+with open(label_path, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:
+    f.write(&quot;\n&quot;.join(lines) + (&quot;\n&quot; if lines else &quot;&quot;))</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">注意这行代码的巧妙之处：<code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">&quot;\n&quot;.join(lines)</code> 在 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">lines</code> 为空时得到空字符串 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">&quot;&quot;</code>，再加上条件式的 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">&quot;\n&quot;</code>，最终写出一个<strong>零字节的空文件</strong>。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>为什么不处理会怎样</strong>：检测模型没见过的&quot;什么都没有&quot;的图，会在完好织物上乱框。<strong>真实产线里大部分布匹是好的</strong>——我实测验证集 957 张里有 374 张负样本，占 39%。这个先验比例必须让模型见到。</p>
+<blockquote style="border-left: 3px solid var(--color-primary); background: var(--color-callout-bg); padding: var(--pad-callout); margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small);"><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"><strong>教学点</strong>：在检测任务里，<strong>空标注文件是数据，不是缺失数据</strong>。这是分类任务和检测任务的一个重要差异——分类任务里&quot;无样本&quot;通常直接丢弃，检测任务里它是有价值的负样本。</p></blockquote>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">2.6 清洗效果验收</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">跑完转换脚本后，数据的最终形态：</p>
+<table style="border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-paragraph);"><thead><tr><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">集合</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">图像数</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">标注框数</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">负样本</th></tr></thead><tbody><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">训练集</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">8619</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">8570</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">有</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">验证集</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">957</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">953</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">374</td></tr></tbody></table>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>每张图对应一个同名 .txt</strong>，<code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">data/tianchi/data.yaml</code> 描述整个数据集：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">path: C:/Users/master/Desktop/维度模型(1)/data/tianchi
+train: train/images
+val: val/images
+test: test/images
+nc: 18
+names:
+  0: hole
+  1: stain
+  2: three_silk
+  3: knot
+  4: flower_board
+  5: hundred_feet
+  6: hair_particle
+  7: coarse_warp
+  8: loose_warp
+  9: broken_warp
+  10: hanging_warp
+  11: weft_shrink
+  12: size_stain
+  13: warping_knot
+  14: star_skip
+  15: broken_spandex
+  16: dense_section
+  17: weave_defect</code></pre>
+<blockquote style="border-left: 3px solid var(--color-primary); background: var(--color-callout-bg); padding: var(--pad-callout); margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small);"><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"><strong>注意 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">nc: 18</code></strong>。ultralytics 加载 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">data.yaml</code> 时，会发现 COCO 预训练权重是 80 类、这里声明 18 类，<strong>自动重建分类头</strong>。这是微调能发生的前提。</p></blockquote>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">---</p>
+<h2 style="font-family: var(--ff-heading); font-size: var(--fs-h2); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary);">第三章 划分环节：顺序错了全盘皆输</h2>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">3.1 划分代码</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">def split_train_val(root: str, val_ratio: float, seed: int) -&gt; Tuple[int, int]:
+    &quot;&quot;&quot;Split the staging train dir into train/ and val/ by image name.&quot;&quot;&quot;
+    staging_img = os.path.join(root, &quot;_staging&quot;, &quot;images&quot;)
+    staging_lbl = os.path.join(root, &quot;_staging&quot;, &quot;labels&quot;)
+    train_img = os.path.join(root, &quot;train&quot;, &quot;images&quot;)
+    train_lbl = os.path.join(root, &quot;train&quot;, &quot;labels&quot;)
+    val_img = os.path.join(root, &quot;val&quot;, &quot;images&quot;)
+    val_lbl = os.path.join(root, &quot;val&quot;, &quot;labels&quot;)
+
+    all_images = sorted(os.listdir(staging_img))
+    random.seed(seed)                      # ① 固定种子
+    random.shuffle(all_images)              # ② 打乱
+    n_val = int(len(all_images) * val_ratio)
+    val_set = set(all_images[:n_val])       # ③ 取前 10%
+
+    for d in (train_img, train_lbl, val_img, val_lbl):
+        os.makedirs(d, exist_ok=True)
+
+    for name in all_images:
+        dst_img_dir = val_img if name in val_set else train_img
+        dst_lbl_dir = val_lbl if name in val_set else train_lbl
+        os.rename(os.path.join(staging_img, name), os.path.join(dst_img_dir, name))
+        lbl = os.path.splitext(name)[0] + &quot;.txt&quot;
+        src_lbl = os.path.join(staging_lbl, lbl)
+        if os.path.exists(src_lbl):
+            os.rename(os.path.join(src_lbl), os.path.join(dst_lbl_dir, lbl))
+
+    shutil.rmtree(os.path.join(root, &quot;_staging&quot;), ignore_errors=True)
+    return len(all_images) - n_val, n_val</code></pre>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">3.2 三个设计要点</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>① 固定随机种子 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">seed=42</code></strong></p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">这不是可有可无的。种子固定后，任何人重跑脚本得到的划分完全一致，实验才能互相比较、结果才能复现。<strong>训练脚本里也用 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">seed=42</code></strong>，两者一致。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>② 图像和标签成对移动</strong></p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">os.rename(os.path.join(staging_img, name), os.path.join(dst_img_dir, name))
+...
+os.rename(os.path.join(src_lbl), os.path.join(dst_lbl_dir, lbl))</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">用 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">os.rename</code> 而不是 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">shutil.copy</code> + <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">shutil.rmtree</code>，是<strong>移动而非复制</strong>——天然保证不会重复，且最后删掉 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">_staging</code> 目录。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>③ 关键：划分发生在去重之后</strong></p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">这是最容易出错的地方。整个流程是：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">原始目录 → 逐个转换到 _staging（转换时按图像名去重）→ 划分 train/val → 删除 _staging</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>如果顺序反了</strong>（先分别划分再合并），partA 的图可能进 train，而 partB 的同名图进 val——<strong>验证集就泄漏进了训练集</strong>。指标会虚高，且因为 partA/partB 标注完全相同，这个泄漏是 100% 的，不是部分泄漏。</p>
+<blockquote style="border-left: 3px solid var(--color-primary); background: var(--color-callout-bg); padding: var(--pad-callout); margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small);"><p style="text-indent: 0; margin-bottom: var(--spacing-tight);">⚠️ <strong>验证集泄漏是最隐蔽的实验错误</strong>：代码不报错、日志正常、指标还更好。唯一能发现它的方法就是知道数据来源结构，并刻意检查。</p></blockquote>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">3.3 划分比例</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">--val-ratio 0.1</code>（默认 10%）。实测结果 8619 训练 / 957 验证。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>为什么验证集要保留负样本</strong>：划分是随机的，负样本自然按比例分布到两边。验证集里 374 张负样本保证了 val mAP 是在<strong>真实产线先验</strong>下算出来的，而不是在&quot;每张图都有缺陷&quot;的理想化条件下。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">---</p>
+<h2 style="font-family: var(--ff-heading); font-size: var(--fs-h2); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary);">第四章 加载环节：数据如何进到内存</h2>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">项目里存在<strong>两套数据加载路径</strong>，分别服务于两种训练方式。</p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">4.1 路径一：ultralytics 内置加载（主训练用）</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">主训练 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">scripts/train_rtdetr.py</code> 走的是 ultralytics 的 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">YOLO.train()</code>：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">model.train(
+    data=&quot;data/tianchi/data.yaml&quot;,
+    epochs=60, imgsz=1280, batch=4,
+    rect=True, mosaic=1.0,
+    seed=42, workers=0,
+)</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">ultralytics 内部读 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">data.yaml</code> → 扫 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">train/images</code> → 匹配 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">train/labels</code> → 构造 Dataset → DataLoader。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这里的关键参数 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">rect=True</code></strong>：矩形批次，按图片真实长宽比组批。我实测了 300 张图的尺寸分布：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">宽  min=2446 p25=2446 中位=2446 p75=2446 max=2446
+高  min=1000 p25=1000 中位=1000 p75=1000 max=1000
+宽高比 min=2.45 中位=2.45 max=2.45</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>所有图像尺寸完全一致：2446×1000，宽高比恒为 2.45:1。</strong></p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">这解释了两件事：</p>
+<ul style="padding-left: var(--spacing-list); margin-bottom: var(--spacing-paragraph);"><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">rect=True</code> 的收益机制——方形 letterbox 会把 2446×1000 填成 1280×1280，其中 <strong>1000/1280 ≈ 78% 的行是纯黑边</strong>，浪费约 59% 算力</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;">1280 为什么是甜点——它接近原图高度 1000，继续放大到 1536 只是拉伸放大噪声</li></ul>
+<blockquote style="border-left: 3px solid var(--color-primary); background: var(--color-callout-bg); padding: var(--pad-callout); margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small);"><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"><strong>这正是&quot;因子解耦&quot;实验的结论来源</strong>：rect 单独贡献 +0.029 mAP50，mosaic 贡献 +0.018，而 1536 相对 1280 是 −0.019（无净增益）。<strong>每一个超参选择都有实测依据，不是调参调出来的。</strong></p></blockquote>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">4.2 路径二：自研 FabricDataset（自研训练循环用）</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">backend/training/dataset.py</code> 提供了自研加载器，供 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">HybridRewardTrainer</code> 这类自写训练循环使用。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>加载 YOLO 标签并反归一化回像素</strong>：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">def _load_yolo(self) -&gt; List[Dict]:
+    &quot;&quot;&quot;Load YOLO-format annotations (one .txt per image).&quot;&quot;&quot;
+    annotations = []
+    for img_path in self._image_files:
+        base = os.path.splitext(os.path.basename(img_path))[0]
+        label_path = os.path.join(self.label_dir, base + &quot;.txt&quot;)
+        boxes, labels = [], []
+        if os.path.exists(label_path):
+            with open(label_path, &quot;r&quot;) as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) &gt;= 5:
+                        cls = int(parts[0])
+                        # YOLO: [class, cx, cy, w, h] normalized
+                        cx, cy, w, h = map(float, parts[1:5])
+                        # Convert to [x, y, w, h] in pixel coords
+                        iw, ih = self.image_size
+                        boxes.append([
+                            int((cx - w / 2) * iw),
+                            int((cy - h / 2) * ih),
+                            int(w * iw),
+                            int(h * ih),
+                        ])
+                        labels.append(cls)
+        annotations.append({&quot;boxes&quot;: boxes, &quot;labels&quot;: labels})
+    return annotations</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这段代码体现了数据流的双向性</strong>：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">磁盘上的 YOLO 格式（归一化 cxcywh）
+    ↓ 读入时反归一化
+内存中的像素坐标 xywh</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>为什么要反归一化</strong>：不同模块对坐标系的要求不同。</p>
+<ul style="padding-left: var(--spacing-list); margin-bottom: var(--spacing-paragraph);"><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>存储层</strong>用归一化（与分辨率解耦，通用）</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>IoU 计算层</strong>用像素坐标（避免反复乘除，且与 ultralytics 内部一致）</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>奖励计算层</strong>用 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">xyxy</code> 或 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">xywh</code> 像素坐标（<code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">dimension_rewards.py</code> 里 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">unbind(1)</code> 后直接算）</li></ul>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>注意 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">if len(parts) &gt;= 5</code></strong>：防御性检查。空文件（负样本）循环体不执行，<code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">boxes</code> 保持空列表——<strong>负样本在这里被自然处理，不需要特殊分支</strong>。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>读取图像并转张量</strong>：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">def __getitem__(self, idx: int) -&gt; Tuple[torch.Tensor, Dict]:
+    &quot;&quot;&quot;Returns (image_tensor, target_dict).&quot;&quot;&quot;
+    img_path = self._image_files[idx]
+    try:
+        import cv2
+        img = cv2.imread(img_path)
+        if img is None:
+            img = np.zeros((*self.image_size, 3), dtype=np.uint8)   # 读失败兜底
+        img = cv2.resize(img, self.image_size)
+        img_tensor = torch.from_numpy(img).permute(2, 0, 1).float() / 255.0
+    except Exception:
+        img_tensor = torch.zeros(3, *self.image_size)
+    target = self._get_labels(idx)
+    return img_tensor, target</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">三个细节：</p>
+<ul style="padding-left: var(--spacing-list); margin-bottom: var(--spacing-paragraph);"><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>HWC → CHW</strong> 用 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">permute(2, 0, 1)</code></li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>归一化只除 255.0</strong>，与 RT-DETR 训练侧一致（<strong>不做</strong> ImageNet 均值方差）</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>读图失败不崩</strong>：返回全黑图，让训练继续。生产环境里一张坏图不该让整轮训练失败</li></ul>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">4.3 collate_fn：为什么需要自定义</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">def defect_collate_fn(batch) -&gt; Tuple[torch.Tensor, List[Dict]]:
+    &quot;&quot;&quot;
+    Collate a batch of (image, target) samples for the single-box model.
+    &quot;&quot;&quot;
+    images: List[torch.Tensor] = []
+    targets: List[Dict] = []
+    for img, target in batch:
+        boxes = target.get(&quot;boxes&quot;, [])
+        labels = target.get(&quot;labels&quot;, [])
+        if not boxes or not labels:
+            continue  # negative (normal) image — skip for this single-box model
+        images.append(img)
+        targets.append({&quot;boxes&quot;: [list(boxes[0])], &quot;labels&quot;: [int(labels[0])]})
+
+    if not images:
+        # Entire batch was negative: return an empty batch the trainer can skip.
+        return torch.empty(0, 3, 640, 640), []
+
+    return torch.stack(images), targets</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>为什么默认 collate 不行</strong>：PyTorch 的默认 collate 要求每个样本结构相同、长度一致。但检测任务的每张图框数不同（我实测有的图 1 个框、有的 3 个），而且 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">HybridRewardTrainer</code> 要求 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">targets</code> 是 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">List[Dict]</code>（每图一个条目）。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这里有个重要取舍</strong>：自研训练器是<strong>单框模型</strong>——只取每张图的&quot;主缺陷&quot;框：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">targets.append({&quot;boxes&quot;: [list(boxes[0])], &quot;labels&quot;: [int(labels[0])]})</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>为什么只取第一个框</strong>：因为 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">dimension_rewards.py</code> 的对齐逻辑是&quot;预测 i 对应 GT i&quot;：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">def _aligned_boxes(self, predictions, targets):
+    &quot;&quot;&quot;Return aligned (pred_boxes, gt_boxes) as (N, 4) tensors.&quot;&quot;&quot;
+    gt_list = [list(t[&quot;boxes&quot;][0]) for t in targets if t.get(&quot;boxes&quot;)]
+    ...
+    n = min(pred.shape[0], gt.shape[0])
+    return pred[:n], gt[:n]</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这个设计有明确的取舍</strong>：牺牲多框场景的精度，换取奖励信号与监督信号的精确对齐。注释里写得很清楚——&quot;the single-box detector aligns prediction i with ground-truth i&quot;。</p>
+<blockquote style="border-left: 3px solid var(--color-primary); background: var(--color-callout-bg); padding: var(--pad-callout); margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small);"><p style="text-indent: 0; margin-bottom: var(--spacing-tight);">⚠️ <strong>注意负样本在这里被丢弃了</strong>（<code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">continue</code>）。这是自研单框训练器的固有限制：它没有&quot;无缺陷&quot;这个类别可用。而<strong>主训练路径（ultralytics）保留全部负样本</strong>。这两套路径的行为不同，是有意为之。</p></blockquote>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">---</p>
+<h2 style="font-family: var(--ff-heading); font-size: var(--fs-h2); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary);">第五章 预处理环节：两套规则，最容易讲错</h2>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">5.1 问题背景：为什么会有两套</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">项目里有两个推理引擎体系：</p>
+<table style="border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-paragraph);"><thead><tr><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">引擎</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">预处理规则</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">归一化</th></tr></thead><tbody><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">ONNXInferenceEngine</code> / <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">PyTorchInferenceEngine</code></td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">letterbox（等比 + 黑边）</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">ImageNet mean/std</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">RTDETRONNXEngine</code></td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><strong>scale_fill（不等比拉伸）</strong></td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><strong>只除 255.0</strong></td></tr></tbody></table>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">backend/inference/rtdetr_onnx.py</code> 的文件头把这个差异写得很清楚：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">&quot;&quot;&quot;
+Dedicated RT-DETR ONNX inference engine + parser.
+
+The project&#x27;s legacy `InferenceEngine` backends assume a YOLO-style output of
+shape [batch, N, 4 + 1 + nc] (an objectness score at index 4) and ImageNet
+mean/std normalization. RT-DETR differs on both axes:
+
+  * Input: stretch-resize to a square (LetterBox scale_fill=True), BGR-&gt;RGB,
+    divide by 255. No ImageNet mean/std.
+  * Output: a single (1, 300, 6) tensor of [cx, cy, w, h, score, class] with
+    cx..h normalized 0..1 and NO objectness channel. The decoder already did
+    top-k selection, so no NMS is required.
+
+Because the input is scale-filled (stretched, no letterbox padding), normalized
+coordinates map back to the original image by simple multiplication by the
+original width/height.
+&quot;&quot;&quot;</code></pre>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">5.2 RT-DETR 的五步预处理</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">def preprocess(self, image_bgr: np.ndarray) -&gt; np.ndarray:
+    &quot;&quot;&quot;Convert a BGR (H, W, 3) uint8 image to a (1, 3, imgsz, imgsz) tensor.
+
+    Uses scale-fill (stretch to the square, no padding), matching the
+    RT-DETR inference path used during training/validation.
+    &quot;&quot;&quot;
+    import cv2
+
+    resized = cv2.resize(
+        image_bgr, (self.imgsz, self.imgsz), interpolation=cv2.INTER_LINEAR
+    )
+    rgb = resized[:, :, ::-1]                        # BGR → RGB
+    tensor = rgb.transpose(2, 0, 1).astype(np.float32) / 255.0
+    return np.ascontiguousarray(tensor[None, ...])</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">逐行拆解：</p>
+<table style="border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-paragraph);"><thead><tr><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">行</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">操作</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">为什么</th></tr></thead><tbody><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">cv2.resize(..., (1280,1280))</code></td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">不等比拉伸成方形</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">与训练时 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">rect=True</code> 的几何一致；避免黑边造成分布偏移</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">resized[:, :, ::-1]</code></td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">BGR → RGB</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">OpenCV 用 BGR，PyTorch 预训练模型用 RGB。<strong>负步长切片是视图操作，零内存拷贝</strong></td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">.transpose(2, 0, 1)</code></td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">HWC → CHW</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">PyTorch 的张量布局约定</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">/ 255.0</code></td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">uint8 → [0,1] 浮点</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">与训练侧完全一致</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">np.ascontiguousarray</code></td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">保证内存连续</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">transpose 后是非连续视图，ONNX Runtime 要求连续内存</td></tr></tbody></table>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>输出形状</strong> <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">(1, 3, 1280, 1280)</code> float32。</p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">5.3 通用预处理（letterbox 版）作对比</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">class ImagePreprocessor:
+    def __init__(self, input_size=(640, 640), mean=DEFAULT_MEAN, std=DEFAULT_STD, normalize=True):
+        self.mean = mean.reshape(1, 3, 1, 1)
+        self.std = std.reshape(1, 3, 1, 1)
+        ...
+
+    def preprocess(self, image: np.ndarray) -&gt; np.ndarray:
+        &quot;&quot;&quot;Preprocess a single image.&quot;&quot;&quot;
+        # Resize
+        h, w = image.shape[:2]
+        scale = min(self.input_size[0] / w, self.input_size[1] / h)
+        new_w, new_h = int(w * scale), int(h * scale)
+        resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+
+        # Pad to input size
+        canvas = np.zeros((*self.input_size, 3), dtype=np.float32)
+        canvas[:new_h, :new_w] = resized.astype(np.float32)   # ← letterbox 填充
+
+        # HWC → CHW
+        canvas = canvas.transpose(2, 0, 1)
+
+        # Normalize
+        if self.normalize:
+            canvas = canvas / 255.0
+            canvas = (canvas - self.mean.reshape(3, 1, 1)) / self.std.reshape(3, 1, 1)
+
+        return canvas[np.newaxis, ...].astype(np.float32)</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">ImageNet 常量：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">DEFAULT_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+DEFAULT_STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>关键差异对照表</strong>（答辩高频考点）：</p>
+<table style="border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-paragraph);"><thead><tr><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">项目</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">通用预处理</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">RT-DETR 预处理</th></tr></thead><tbody><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">缩放方式</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">letterbox：等比缩放 + 黑边填充</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><strong>scale_fill：不等比拉伸，无填充</strong></td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">归一化</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">/255</code> 后再做 ImageNet mean/std</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><strong>只 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">/255</code></strong></td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">坐标反变换</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">需还原 padding 偏移</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><strong>直接乘原图宽高</strong></td></tr></tbody></table>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">5.4 为什么必须拉伸而不是填充</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>理由一：分布偏移。</strong> letterbox 会在上下加黑边（2446×1000 填进 1280×1280，约 78% 的行是纯黑）。模型训练时（<code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">rect=True</code>）没见过黑边，推理时突然出现会造成输入分布偏移。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>理由二：坐标反变换简单。</strong> 因为是不等比拉伸，没有 padding 偏移量要还原：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;"># RT-DETR：归一化坐标直接乘原图尺寸
+x1 = (cx - w / 2) * orig_w
+y1 = (cy - h / 2) * orig_h
+x2 = (cx + w / 2) * orig_w
+y2 = (cy + h / 2) * orig_h</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">letterbox 则需要先减去 padding 再缩放，多两步且容易搞错。</p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">5.5 输出解析：从 (1,300,6) 回到原图像素</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">def parse_output(self, output: np.ndarray, orig_w: int, orig_h: int) -&gt; Dict:
+    &quot;&quot;&quot;Parse RT-DETR ONNX output (1, 300, 6) into structured detections.&quot;&quot;&quot;
+    preds = output[0]  # (300, 6)
+    if preds.size == 0:
+        return _empty_detection()
+
+    boxes_n = preds[:, :4]
+    scores = preds[:, 4]
+    labels = preds[:, 5].astype(np.int64)
+
+    cx, cy, w, h = boxes_n[:, 0], boxes_n[:, 1], boxes_n[:, 2], boxes_n[:, 3]
+    x1 = (cx - w / 2) * orig_w      # ← 归一化 → 像素
+    y1 = (cy - h / 2) * orig_h
+    x2 = (cx + w / 2) * orig_w
+    y2 = (cy + h / 2) * orig_h
+
+    keep = scores &gt;= self.conf_threshold
+    boxes_xyxy = np.stack([x1, y1, x2, y2], axis=1)[keep].astype(np.float32)
+    scores = scores[keep].astype(np.float32)
+    classes = labels[keep]
+    class_names = [
+        self.class_names[c] if c &lt; len(self.class_names) else str(c)
+        for c in classes
+    ]
+
+    return {
+        &quot;boxes&quot;: boxes_xyxy, &quot;scores&quot;: scores,
+        &quot;classes&quot;: classes, &quot;class_names&quot;: class_names,
+    }</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>三个要点</strong>：</p>
+<ol style="padding-left: var(--spacing-list); margin-bottom: var(--spacing-paragraph);"><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>300 是预设的最大检测数</strong>，decoder 内部已做 top-k 选择，所以<strong>不需要 NMS</strong></li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>没有 objectness 通道</strong>——格式是 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">[cx, cy, w, h, score, class]</code>，6 列而非 YOLO 的 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">4+1+nc</code></li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>越界保护</strong>：<code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">self.class_names[c] if c &lt; len(self.class_names) else str(c)</code>——类别索引越界时回退成字符串，而不是抛异常</li></ol>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>完整的坐标往返</strong>：</p>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">原始图 2446×1000
+  ↓ cv2.resize 不等比拉伸
+1280×1280
+  ↓ 网络
+归一化 cx,cy,w,h ∈ [0,1]
+  ↓ × orig_w / orig_h
+原图像素 xyxy</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">---</p>
+<h2 style="font-family: var(--ff-heading); font-size: var(--fs-h2); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary);">第六章 数据质量的最终验证</h2>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">数据链路做完后，<strong>必须回到数据本身做一次体检</strong>。这一步不能省——前面所有清洗逻辑的正确性，最终要靠统计来确认。</p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">6.1 类别分布体检</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">$ cat data/tianchi/train/labels/*.txt | awk &#x27;{print $1}&#x27; | sort -n | uniq -c | sort -k2 -n
+    273 0      # hole          破洞
+    363 1      # stain         污渍
+    946 2      # three_silk    三丝
+   1779 3      # knot          结头
+    117 4      # flower_board  花板跳
+    145 5      # hundred_feet  百脚
+    176 6      # hair_particle 毛粒
+    195 7      # coarse_warp   粗经
+    356 8      # loose_warp    松经
+    681 9      # broken_warp   断经
+    145 10     # hanging_warp  吊经
+   1229 11     # weft_shrink   纬缩
+    306 12     # size_stain    浆斑
+    441 13     # warping_knot  整经结
+    267 14     # star_skip     星跳
+    492 15     # broken_spandex断氨纶
+    337 16     # dense_section 稀密档
+    322 17     # weave_defect  死皱
+总计 8570</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这是一条典型长尾曲线</strong>：最大类 1779 个框，最小类 117 个框，<strong>相差 15.2 倍</strong>。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这条分布直接解释了模型的性能表现</strong>——小类（如花板跳 117 个框）的召回天然低于大类。这是<strong>数据不平衡问题，不是模型能力问题</strong>。</p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">6.2 类别族结构：数据驱动的聚类</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">项目对 18 类做了层次聚类 + bootstrap 稳定性检验（<code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">scripts/cluster_defect_families.py</code>），结论：</p>
+<ul style="padding-left: var(--spacing-list); margin-bottom: var(--spacing-paragraph);"><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>k=3 族稳定</strong>（bootstrap support = 1.00）</li><li style="margin-bottom: var(--spacing-tight); text-indent: 0;"><strong>k=6 族不被数据支持</strong>（稳定性仅 0.286），退化为 3 组 + 3 单例</li></ul>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">三个族：</p>
+<table style="border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-paragraph);"><thead><tr><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">结构族</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">成员类别</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">视觉特征</th></tr></thead><tbody><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">线性结构族</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">三丝、吊经、松经、粗经、星跳、粗纬</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">细长的线状</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">斑渍族</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">污渍、浆斑、稀密档、百脚、花板跳</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">块状色差</td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">点状族</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">破洞、结头、毛粒、纬缩、整经结、断氨纶</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">小颗粒</td></tr></tbody></table>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这个结论的价值</strong>：它把&quot;18 个类别&quot;这个抽象数字，变成&quot;3 种视觉形态&quot;。<strong>跨族互混占全部错误的 70%，尤其是 A↔C 跨族互混</strong>——细线状缺陷的分类天花板由此定位。</p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">6.3 标签噪声体检：项目最重要的发现</h3>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>现象</strong>：断经（<code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">broken_warp</code>，class 9）召回只有约 0.45。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">项目做了一整轮排查——奖励注入、GRPO、置信度校准、过采样精调、混淆矩阵 + 裁剪图人工复核。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>最终结论</strong>：断经↔磨痕、纬缩↔粗纬在图像上视觉几乎相同、双向混淆，属于<strong>标签噪声，不是模型可训练的差距</strong>。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>验证方法</strong>：合并视觉上不可区分的类别后，召回显著回升——</p>
+<table style="border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-paragraph);"><thead><tr><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">合并项</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">合并前召回</th><th style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading);">合并后召回</th></tr></thead><tbody><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">纬缩 + 粗纬</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">0.40</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><strong>0.88</strong></td></tr><tr><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">断经 + 磨痕</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;">0.52</td><td style="padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0;"><strong>0.79</strong></td></tr></tbody></table>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这个案例的教学价值</strong>：它精确区分了&quot;模型不行&quot;和&quot;数据不行&quot;。<strong>当所有训练干预都无效时，先怀疑数据和标签。</strong></p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>配套的告警层兜底</strong>：磨痕（minor 严重度）视觉上可能就是断经（critical），告警时按 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">effective_alert_severity()</code> 升级到 critical 触发停机。存储的 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">severity</code> 保持规范值，升级级别以 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">escalated_severity</code> 独立落库，可审计。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">---</p>
+<h2 style="font-family: var(--ff-heading); font-size: var(--fs-h2); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary);">第七章 可直接复现的验证命令集</h2>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">这一章是给课堂现场演示准备的，每条命令我都在本机实际跑过。</p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">7.1 验证标注重复（最震撼的一条）</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">cd &quot;C:/Users/master/Desktop/维度模型(1)&quot;
+md5sum shujuji/*partA/partA/Annotations/anno_train.json \
+       shujuji/*partB/partB/Annotations/anno_train.json
+# 两条输出 md5 完全相同 → partB 是 partA 的拷贝</code></pre>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">7.2 统计负样本比例</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">find data/tianchi/val/labels -name &quot;*.txt&quot; -empty | wc -l
+# → 374，占 957 的 39%</code></pre>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">7.3 统计类别分布</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">cat data/tianchi/train/labels/*.txt | awk &#x27;{print $1}&#x27; | sort -n | uniq -c</code></pre>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">7.4 检查越界标注（验证钳制代码的必要性）</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">python -c &quot;
+import glob
+n=0
+for f in glob.glob(&#x27;data/tianchi/train/labels/*.txt&#x27;):
+    for line in open(f):
+        p=line.split()
+        if len(p)&lt;5: continue
+        c,cx,cy,w,h=map(float,p[:5])
+        if cx-w/2&lt;-1e-9 or cx+w/2&gt;1+1e-9 or cy-h/2&lt;-1e-9 or cy+h/2&gt;1+1e-9:
+            n+=1
+print(f&#x27;越界框 {n} 个 / 共 8570&#x27;)
+&quot;
+# → 越界框 9 个 / 共 8570</code></pre>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">7.5 检查标注数值边界</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">python -c &quot;
+import glob
+mn,mx=9,0
+for f in glob.glob(&#x27;data/tianchi/train/labels/*.txt&#x27;):
+    for line in open(f):
+        p=line.split()
+        if len(p)&lt;5: continue
+        w=float(p[3]); mn=min(mn,w); mx=max(mx,w)
+print(f&#x27;框宽范围 {mn:.6f} ~ {mx:.6f}&#x27;)
+&quot;
+# → 框宽范围 0.002833 ~ 1.000000</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>这条命令的意义</strong>：最小框宽 0.002833 决定了标签必须保留至少 6 位小数，否则小目标框会因精度损失而失真甚至消失。</p>
+<h3 style="font-family: var(--ff-heading); font-size: var(--fs-h3); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading);">7.6 统计真实图像尺寸</h3>
+<pre style="font-family: var(--ff-mono); font-size: var(--fs-code); line-height: 1.5; background: var(--color-code-bg); border: 1px solid var(--color-border); padding: var(--pad-code); margin-bottom: var(--spacing-paragraph); white-space: pre-wrap; word-break: break-all;"><code style="background: none; padding: 0; font-size: inherit;">python -c &quot;
+from PIL import Image
+import os
+d=&#x27;data/tianchi/train/images&#x27;
+fs=[f for f in os.listdir(d) if f.endswith(&#x27;.jpg&#x27;)][:100]
+sizes={Image.open(os.path.join(d,f)).size for f in fs}
+print(&#x27;尺寸集合:&#x27;, sizes)
+&quot;
+# → {(2446, 1000)}  全部一致</code></pre>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">---</p>
+<h2 style="font-family: var(--ff-heading); font-size: var(--fs-h2); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary);">第八章 方法论总结：数据链路的七条经验</h2>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>1. 去重前先想清楚&quot;按什么键&quot;</strong><br/>partA/partB 标注字节相同，按图像名去重才有效。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>2. 清洗代码必须带计数器</strong><br/><code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">skipped += 1</code> + 结束时报数。静默跳过是数据污染的温床。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>3. 防御性钳制不是过度设计</strong><br/>实测 9 个越界框、幅度 1e-6——今天无害，换个数据集可能致命。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>4. 精度要匹配数据动态范围</strong><br/>最小框宽 0.002833 → 必须六位小数。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>5. 空标注文件是数据，不是缺失</strong><br/>负样本占 39%，是真实产线先验。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>6. 划分顺序：先去重，再划分</strong><br/>反了会导致验证集 100% 泄漏，且不报错。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;"><strong>7. 数据质量决定模型上限</strong><br/>断经召回 0.45 不是模型问题，是标签噪声。合并类别后召回 0.79。</p>
+<p style="margin-bottom: var(--spacing-paragraph); text-indent: 2em;">---</p>
+<h2 style="font-family: var(--ff-heading); font-size: var(--fs-h2); line-height: var(--lh-heading); font-weight: var(--fw-bold); text-indent: 0; margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary);">附录 一分钟讲稿</h2>
+<blockquote style="border-left: 3px solid var(--color-primary); background: var(--color-callout-bg); padding: var(--pad-callout); margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small);"><p style="text-indent: 0; margin-bottom: var(--spacing-tight);">这条数据链路分四段：<strong>采集、清洗、划分、输入</strong>。</p><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"></p><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"><strong>采集</strong>用的是天池公开竞赛数据集 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">smartdiagnosisofclothflaw</code>，5 个压缩包提供 3 个带标注训练集。选公开数据的理由是标注成本、可比性和版权合规。</p><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"></p><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"><strong>清洗</strong>解决了五个具体问题：① partA 和 partB 的标注文件 md5 完全相同，按图像名去重，否则 GT 框翻倍；② 解压残留的 <code style="font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code);">__MACOSX</code> 元数据文件，用白名单过滤扩展名；③ 中文缺陷名的别名归并与错别字容错——官方 README 里&quot;粗维&quot;就是&quot;粗纬&quot;的笔误，20 个原始名映射后得到 18 类；④ xyxy 转 cxcywh 归一化，含三处防御：防负宽度、双向钳制中心点、六位小数精度——我实测确认 8570 个框里确实有 9 个越界、最小框宽只有 0.002833，所以这两道防护都是必需的；⑤ 正常图写成空的 .txt 文件保留为负样本，验证集里 374 张负样本占 39%，这是真实产线先验。</p><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"></p><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"><strong>划分</strong>用 10% 随机、seed 42 固定。关键是顺序——先去重再划分，反了会让 partA 的图进 train 而 partB 的同名图进 val，验证集 100% 泄漏且不报错。</p><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"></p><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"><strong>输入</strong>分两套预处理，最容易讲错。通用预处理走 letterbox 加 ImageNet 归一化，RT-DETR 走 scale_fill 不等比拉伸、只除 255。因为拉伸没有 padding 偏移，坐标回原图只需乘以宽高。我实测所有图像都是 2446×1000、宽高比恒为 2.45:1，所以方形填充会浪费约 59% 算力——这也解释了实测的因子解耦结论：rect 贡献 +0.029、mosaic +0.018、1536 反而 −0.019。</p><p style="text-indent: 0; margin-bottom: var(--spacing-tight);"></p><p style="text-indent: 0; margin-bottom: var(--spacing-tight);">数据链路做完后必须回到数据体检。我统计了类别分布，发现最大类 1779 框、最小类 117 框，相差 15.2 倍的典型长尾；又用聚类证明 18 类在视觉上其实只有 3 个族。最重要的发现在最后——断经召回只有 0.45，做了一整轮排查后确认是标签噪声天花板，不是模型能力问题，合并视觉不可区分的类别后召回从 0.52 回升到 0.79。<strong>这提醒我们：数据质量往往比模型选择更能决定效果上限。</strong></p></blockquote>

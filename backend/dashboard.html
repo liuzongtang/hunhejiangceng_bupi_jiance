@@ -139,6 +139,7 @@ tbody tr:hover{background:#f0f4fa}
   <div class="tab" id="tab-alerts" onclick="switchTab('alerts')">告警</div>
   <div class="tab" id="tab-model" onclick="switchTab('model')">模型</div>
   <div class="tab" id="tab-storage" onclick="switchTab('storage')">存储</div>
+  <div class="tab" id="tab-feedback" onclick="switchTab('feedback')">纠错</div>
 </div>
 
 <div class="content">
@@ -208,6 +209,44 @@ tbody tr:hover{background:#f0f4fa}
     <table><thead><tr><th>文件名</th><th>大小</th><th>操作</th></tr></thead><tbody id="storage-list"></tbody></table>
   </div>
 </div>
+
+<!-- FEEDBACK -->
+<div id="panel-feedback" class="panel">
+  <div class="grid2">
+    <div class="panel-frame"><h3>提交纠错</h3>
+      <input class="dash-input" id="fbImageId" placeholder="图片ID（YOLO标签文件名）" style="width:100%;margin-bottom:6px">
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <select class="dash-input" id="fbType" style="flex:1" onchange="fbToggleOldClass()">
+          <option value="false_positive">误报（删框）</option>
+          <option value="missed_defect">漏检（补框）</option>
+          <option value="misclassification">错分（改类）</option>
+        </select>
+        <select class="dash-input" id="fbClass" style="flex:1"></select>
+      </div>
+      <div id="fbOldClassWrap" style="display:none;margin-bottom:6px">
+        <select class="dash-input" id="fbOldClass" style="width:100%"></select>
+        <div style="font-size:12px;color:var(--text2)">错分：检测器原判类别</div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <input class="dash-input" id="fbCx" placeholder="cx" title="中心x (0~1)" style="flex:1">
+        <input class="dash-input" id="fbCy" placeholder="cy" title="中心y (0~1)" style="flex:1">
+        <input class="dash-input" id="fbW" placeholder="w" title="宽 (0~1)" style="flex:1">
+        <input class="dash-input" id="fbH" placeholder="h" title="高 (0~1)" style="flex:1">
+      </div>
+      <button class="dash-btn green" onclick="submitFeedback()" style="width:100%">提交纠错</button>
+      <div style="font-size:12px;margin-top:6px;color:var(--text2)" id="fbStatus"></div>
+    </div>
+    <div class="panel-frame"><h3>纠错闭环</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">纠错累积后写回 YOLO 标签，满 50 条触发增量微调。</p>
+      <button class="dash-btn accent" onclick="applyFeedback()" style="width:100%">应用全部待处理纠错</button>
+      <div style="font-size:12px;margin-top:8px;color:var(--text2)" id="fbApplyStatus"></div>
+    </div>
+  </div>
+  <div class="panel-frame" style="margin-top:14px"><h3>纠错记录</h3>
+    <button class="dash-btn" style="margin-bottom:8px" onclick="loadFeedback()">刷新</button>
+    <table><thead><tr><th>图片</th><th>类型</th><th>类别</th><th>状态</th><th>时间</th></tr></thead><tbody id="fb-list"></tbody></table>
+  </div>
+</div>
 </div>
 
 <div class="statusbar">
@@ -238,6 +277,7 @@ function switchTab(n){
   if(n==='alerts'){renderRange('alert-range','alerts');}
   if(n==='model') loadModel();
   if(n==='storage') loadStorageImages();
+  if(n==='feedback') loadFeedback();
 }
 
 function badge(s){return '<span class="badge '+(s||'info')+'">'+(s||'info')+'</span>';}
@@ -466,6 +506,65 @@ function connectWS(){
 connectWS();
 setInterval(function(){if(ws&&ws.readyState===WebSocket.OPEN) ws.send('ping');},30000);
 
+// === FEEDBACK ===
+var FB_CLASSES=['破洞','污渍','三丝','结头','花板跳','百脚','毛粒','粗经','松经','断经','吊经','纬缩','浆斑','整经结','星跳','断氨纶','稀密档','死皱'];
+var FB_TYPES={false_positive:'误报',missed_defect:'漏检',misclassification:'错分'};
+
+function fbFillSelects(){
+  var c=document.getElementById('fbClass');
+  var o=document.getElementById('fbOldClass');
+  var ch='',oh='<option value="">— 原类别 —</option>';
+  for(var i=0;i<FB_CLASSES.length;i++){
+    ch+='<option value="'+i+'">'+i+' · '+FB_CLASSES[i]+'</option>';
+    oh+='<option value="'+i+'">'+i+' · '+FB_CLASSES[i]+'</option>';
+  }
+  c.innerHTML=ch;
+  o.innerHTML=oh;
+}
+function fbToggleOldClass(){
+  document.getElementById('fbOldClassWrap').style.display=(document.getElementById('fbType').value==='misclassification')?'block':'none';
+}
+async function submitFeedback(){
+  var type=document.getElementById('fbType').value;
+  var imageId=document.getElementById('fbImageId').value.trim();
+  var cx=parseFloat(document.getElementById('fbCx').value);
+  var cy=parseFloat(document.getElementById('fbCy').value);
+  var w=parseFloat(document.getElementById('fbW').value);
+  var h=parseFloat(document.getElementById('fbH').value);
+  if(!imageId||isNaN(cx)||isNaN(cy)||isNaN(w)||isNaN(h)){document.getElementById('fbStatus').textContent='请填写图片ID与框坐标 (cx/cy/w/h)';return;}
+  var payload={image_id:imageId,feedback_type:type,class_id:parseInt(document.getElementById('fbClass').value),bbox:{cx:cx,cy:cy,w:w,h:h},source:'dashboard'};
+  if(type==='misclassification'){
+    var old=parseInt(document.getElementById('fbOldClass').value);
+    if(isNaN(old)){document.getElementById('fbStatus').textContent='错分需选择原类别';return;}
+    payload.old_class_id=old;
+  }
+  document.getElementById('fbStatus').textContent='提交中...';
+  var r=await fetch('/api/v1/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  var d=await r.json();
+  document.getElementById('fbStatus').textContent=r.ok?('已记录: '+(d.data&&d.data.feedback_id)):('失败: '+(d.detail||'未知错误'));
+  if(r.ok) loadFeedback();
+}
+async function loadFeedback(){
+  var d=await api('/api/v1/feedback?limit=50');
+  var rows=d&&d.data?d.data:[];
+  var html='';
+  for(var j=0;j<rows.length;j++){
+    var r=rows[j];
+    html+='<tr><td>'+r.image_id+'</td><td>'+FB_TYPES[r.feedback_type]+'</td><td>'+r.class_id+' · '+r.class_name+'</td><td>'+badge(r.status==='pending'?'minor':r.status)+' '+r.status+'</td><td>'+((r.created_at||'').slice(0,19).replace('T',' '))+'</td></tr>';
+  }
+  document.getElementById('fb-list').innerHTML=rows.length?html:'<tr><td colspan="5" style="color:var(--text2)">暂无纠错记录</td></tr>';
+}
+async function applyFeedback(){
+  document.getElementById('fbApplyStatus').textContent='应用处理中...';
+  var r=await fetch('/api/v1/feedback/apply',{method:'POST'});
+  var d=await r.json();
+  var s=d&&d.data?d.data:{};
+  var msg='已处理 '+s.total+' 条：应用 '+s.applied+'，跳过 '+s.skipped+'，无标签 '+s.no_label;
+  if(s.should_fine_tune) msg+=' · 已达增量微调阈值';
+  document.getElementById('fbApplyStatus').textContent=msg;
+  loadFeedback();
+}
+
 // === MAIN LOOP ===
 async function refreshAll(){
   await checkHealth();
@@ -477,6 +576,7 @@ async function refreshAll(){
 }
 function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleString();}
 
+fbFillSelects();
 refreshAll();updateClock();
 setInterval(refreshAll,5000);setInterval(updateClock,1000);
 </script>

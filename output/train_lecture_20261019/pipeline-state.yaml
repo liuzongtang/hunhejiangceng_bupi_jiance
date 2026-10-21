@@ -1,0 +1,51 @@
+request_id: train_lecture_20261019
+created_at: "2026-10-19T21:15:00+08:00"
+entry_type: full_pipeline
+current_stage: 1
+intent: 整理带代码片段的深度学习训练流程讲义，供学生课堂使用
+output_docx_path: "C:\\Users\\master\\Desktop\\维度模型(1)\\output\\train_lecture_20261019\\stage3\\织物瑕疵检测训练流程讲义.docx"
+output_docx_user_specified: false
+
+stages:
+  stage1:
+    status: completed
+    started_at: "2026-10-19T21:16:00+08:00"
+    completed_at: "2026-10-19T21:24:00+08:00"
+    expert_used: tech-blog-expert
+    route_tag: expert_tech_blog
+    genre: tech-blog
+    output_path: "stage1/final_draft.md"
+  stage2:
+    status: completed
+    started_at: "2026-10-19T21:25:00+08:00"
+    completed_at: "2026-10-19T21:34:00+08:00"
+    route: html
+    html_sub: template
+    genre: general
+    template_used: base.html
+    design_tokens_path: "skills/design-token/tokens/compiled/general.json"
+    skills_invoked: [design-token, doc-typeset, html-review]
+    html_review_attempts: 1
+    fallback: true
+    fallback_reason: tech_blog genre 未命中垂类模板，回退 general/modern-minimal 主题
+    output_path: "stage2/formatted-织物瑕疵检测训练流程讲义.html"
+    output_format: html
+  stage3:
+    status: completed
+    started_at: "2026-10-19T21:36:00+08:00"
+    completed_at: "2026-10-19T21:37:00+08:00"
+    executor: doc-converter
+    input_format: html
+    skill_used: ["html-to-doc"]
+    present_files_opened: true
+    fallback: false
+    fallback_used: false
+    fallback_reason: null
+    preflight_passed: true
+    chunks: null
+    output_path: "stage3/织物瑕疵检测训练流程讲义.docx"
+
+degradations: []
+consistency_check:
+  status: completed
+  note: S1→S2→S3 全链路完成，preflight 通过（has_style/has_page_rule 均true），AIGC 隐标已写入

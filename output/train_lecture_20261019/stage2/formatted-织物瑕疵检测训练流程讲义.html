@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="docx-page-size" content="A4">
+  <title>织物瑕疵检测：模型训练全流程讲义</title>
+  <style>
+  :root {
+    --page-content-width: 15.6cm;
+    --fs-title: 26pt;
+    --fs-subtitle: 13pt;
+    --fs-h1: 18pt;
+    --fs-h2: 15pt;
+    --fs-h3: 13pt;
+    --fs-body: 12pt;
+    --fs-small: 10.5pt;
+    --fs-code: 9.5pt;
+    --ff-heading: "SimHei", "黑体", sans-serif;
+    --ff-body: "SimSun", "宋体", serif;
+    --ff-mono: "Consolas", "JetBrains Mono", monospace;
+    --lh-body: 1.65;
+    --lh-heading: 1.35;
+    --fw-bold: 700;
+    --color-primary: #1D4ED8;
+    --color-heading: #0F2E6B;
+    --color-subheading: #1E3A8A;
+    --color-callout-bg: #EFF6FF;
+    --color-text: #111827;
+    --color-muted: #6B7280;
+    --color-border: #D1D5DB;
+    --color-bg: #FFFFFF;
+    --color-highlight: #F3F4F6;
+    --color-code-bg: #F9FAFB;
+    --spacing-paragraph: 0.6em;
+    --spacing-section: 1.8em;
+    --spacing-sub: 1.2em;
+    --spacing-list: 2.4em;
+    --spacing-tight: 0.3em;
+    --spacing-toc-indent: 1.6em;
+    --pad-code: 8px 10px;
+    --pad-cell: 5px 8px;
+    --pad-callout: 7px 10px;
+    --pad-inline-code: 1px 3px;
+  }
+  @page { @bottom-center { content: counter(page); } }
+  @page cover { @bottom-center { content: none; } }
+  section[role="cover"] { page: cover; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--ff-body);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--color-text);
+    background: var(--color-bg);
+    max-width: var(--page-content-width);
+    margin-left: auto;
+    margin-right: auto;
+  }
+  h1, h2, h3 {
+    font-family: var(--ff-heading);
+    line-height: var(--lh-heading);
+    font-weight: var(--fw-bold);
+    text-indent: 0;
+  }
+  h1 { font-size: var(--fs-h1); margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-heading); }
+  h2 { font-size: var(--fs-h2); margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); color: var(--color-primary); }
+  h3 { font-size: var(--fs-h3); margin-top: var(--spacing-sub); margin-bottom: var(--spacing-tight); color: var(--color-subheading); }
+  p { margin-bottom: var(--spacing-paragraph); text-indent: 2em; }
+  ul, ol { padding-left: var(--spacing-list); margin-bottom: var(--spacing-paragraph); }
+  li { margin-bottom: var(--spacing-tight); text-indent: 0; }
+  li p { text-indent: 0; }
+  strong { font-weight: var(--fw-bold); }
+  code { font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-code-bg); padding: var(--pad-inline-code); }
+  pre {
+    font-family: var(--ff-mono);
+    font-size: var(--fs-code);
+    line-height: 1.5;
+    background: var(--color-code-bg);
+    border: 1px solid var(--color-border);
+    padding: var(--pad-code);
+    margin-bottom: var(--spacing-paragraph);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-paragraph); }
+  th, td { padding: var(--pad-cell); border: 1px solid var(--color-border); text-align: left; text-indent: 0; }
+  th { font-weight: var(--fw-bold); background: var(--color-highlight); font-family: var(--ff-heading); }
+  blockquote {
+    border-left: 3px solid var(--color-primary);
+    background: var(--color-callout-bg);
+    padding: var(--pad-callout);
+    margin-bottom: var(--spacing-paragraph);
+    font-size: var(--fs-small);
+  }
+  blockquote p { text-indent: 0; margin-bottom: var(--spacing-tight); }
+  blockquote p:last-child { margin-bottom: 0; }
+  .toc-list, .toc-list ol, .toc-list ul { list-style: none; list-style-type: none; padding-left: var(--spacing-toc-indent); }
+  .toc-list li { margin-bottom: var(--spacing-tight); text-indent: 0; }
+  .toc-list a { color: var(--color-primary); text-decoration: none; }
+  .toc-title { font-family: var(--ff-heading); font-size: var(--fs-h2); font-weight: var(--fw-bold); text-indent: 0; margin-bottom: var(--spacing-sub); }
+  .cover-eyebrow { text-align: center; font-size: var(--fs-small); color: var(--color-muted); font-family: var(--ff-heading); margin-bottom: var(--spacing-sub); text-indent: 0; }
+  .cover-title { text-align: center; font-size: var(--fs-title); font-family: var(--ff-heading); font-weight: var(--fw-bold); color: var(--color-heading); margin-bottom: var(--spacing-paragraph); text-indent: 0; line-height: 1.4; }
+  .cover-subtitle { text-align: center; font-size: var(--fs-subtitle); color: var(--color-muted); margin-bottom: var(--spacing-section); text-indent: 0; }
+  .cover-meta { text-align: center; font-size: var(--fs-small); color: var(--color-muted); text-indent: 0; line-height: 2; }
+  .no-indent { text-indent: 0; }
+  </style>
+</head>
+<body>
+
+<section role="cover">
+  <p class="cover-eyebrow">人工智能框架课 · 项目讲解讲义</p>
+  <p class="cover-title">织物瑕疵检测<br>模型训练全流程</p>
+  <p class="cover-subtitle">从数据清洗到七维可微奖励<br>RT-DETR-L 目标检测实战</p>
+  <p class="cover-meta">
+    数据集：天池 smartdiagnosisofclothflaw<br>
+    模型：RT-DETR-L（全参数微调）<br>
+    官方口径 mean mAP：0.6349<br>
+    代码规模：27027 行 / 205 个测试
+  </p>
+</section>
+
+<section role="cover">
+<nav class="doc-toc" aria-label="文档目录">
+  <p class="toc-title">目录</p>
+  <ol class="toc-list">
+    <li><a href="#section-1">读这份讲义的收获</a></li>
+    <li><a href="#section-2">前置要求与阅读方式</a></li>
+    <li><a href="#section-3">第一章 项目全景</a></li>
+    <li><a href="#section-4">第二章 数据从哪来、怎么洗</a></li>
+    <li><a href="#section-5">第三章 模型是怎么训练的</a></li>
+    <li><a href="#section-6">第四章 微调了哪些部分</a></li>
+    <li><a href="#section-7">第五章 七维可微奖励</a></li>
+    <li><a href="#section-8">第六章 两个真实踩过的坑</a></li>
+    <li><a href="#section-9">第七章 实验结果与诚实结论</a></li>
+    <li><a href="#section-10">第八章 常见问题</a></li>
+    <li><a href="#section-11">附录 一分钟讲稿</a></li>
+  </ol>
+</nav>
+</section>
+
+<section role="body" data-page-restart="1">
+
+<h1 id="section-1">读这份讲义的收获</h1>
+
+<p>读完并动手复现，你将能够：</p>
+<ul>
+<li>说清一个织物瑕疵检测项目的<strong>数据从哪来、怎么洗、怎么进模型</strong></li>
+<li>解释 <strong>RT-DETR 相比 YOLO 为什么不需要 NMS</strong>，以及微调时哪些层被训练</li>
+<li>手写<strong>七维可微奖励</strong>的每一个公式，并解释为什么要用 softmax 代替 argmax</li>
+<li>复现两个真实踩过的坑：梯度裁剪过松导致 NaN、fp16 导致 BN 层 <code>running_var</code> 归零使 mAP 崩为 0</li>
+<li>对实验结果做出<strong>诚实的能力边界判断</strong>，区分「模型不行」与「数据不行」</li>
+</ul>
+
+<h1 id="section-2">前置要求与阅读方式</h1>
+
+<p><strong>前置知识</strong>（按依赖顺序）：</p>
+<ol>
+<li>卷积神经网络基本原理（卷积核、池化、感受野）</li>
+<li>Softmax 与交叉熵损失</li>
+<li>反向传播与计算图，理解「梯度从哪来」</li>
+<li>边界框表示（<code>xyxy</code> 与 <code>cxcywh</code>）、IoU 计算</li>
+<li>训练/验证/测试集划分与过拟合</li>
+</ol>
+
+<p><strong>技术栈版本</strong>：</p>
+<table>
+<thead><tr><th>组件</th><th>版本</th></tr></thead>
+<tbody>
+<tr><td>Python</td><td>3.13（训练环境为 anaconda3 base）</td></tr>
+<tr><td>PyTorch</td><td>2.8.0+cu126</td></tr>
+<tr><td>Ultralytics</td><td>8.4.91</td></tr>
+<tr><td>GPU</td><td>RTX 4090 D 24GB</td></tr>
+<tr><td>数据集</td><td>天池 <code>smartdiagnosisofclothflaw</code></td></tr>
+</tbody>
+</table>
+
+<blockquote><p><strong>阅读建议</strong>：全文约 25 分钟。若时间紧，优先读「第三章 模型是怎么训练的」与「第四章 微调了哪些部分」，这是课堂提问的密集区。</p></blockquote>
+
+<h1 id="section-3">第一章 项目全景：一条完整的工业视觉链路</h1>
+
+<h2>1.1 系统架构总览</h2>
+
+<p>本项目不是单一模型，而是一套 <strong>27027 行</strong>的工业视觉系统，涵盖数据工程、模型训练、推理服务、实时展示四大阶段，共 11 个关键步骤。</p>
+
+<table>
+<thead><tr><th>阶段</th><th>核心产出</th><th>关键脚本</th></tr></thead>
+<tbody>
+<tr><td>数据工程</td><td>8619 张训练图 / 8570 个标注框</td><td><code>scripts/convert_tianchi_to_yolo.py</code></td></tr>
+<tr><td>模型训练</td><td>mAP50 = 0.541（18 类）</td><td><code>scripts/train_rtdetr.py</code></td></tr>
+<tr><td>推理服务</td><td><code>(1, 300, 6)</code> 张量输出</td><td><code>backend/inference/</code></td></tr>
+<tr><td>实时展示</td><td>中文看板 + WebSocket 告警</td><td><code>backend/dashboard.html</code></td></tr>
+</tbody>
+</table>
+
+<h2>1.2 代码分层架构</h2>
+
+<pre><code>前端层  零构建 dashboard.html + simulator.html（Canvas + Chart.js）
+    ↓ REST + WebSocket
+接入层  routers/ 只做三件事：Pydantic 校验 → 调 service → 包 APIResponse
+    ↓
+业务层  services/ 与模型层 inference/ 并行调用
+    ↓
+数据层  models/ + database.py（SQLAlchemy 2.0 async）</code></pre>
+
+<p>贯穿全栈的主线是<strong>单一事实来源</strong>：<code>backend/schemas/defect.py</code> 定义 18 类枚举与严重度，训练、推理、告警、前端全部引用它。</p>
+
+<h2>1.3 缺陷分类体系</h2>
+
+<p>原始 20 类中有两对视觉上几乎无法区分的类别，经实证诊断后合并为 18 类：</p>
+
+<table>
+<thead><tr><th>合并项</th><th>原类别</th><th>合并原因</th></tr></thead>
+<tbody>
+<tr><td>断经 ↔ 磨痕</td><td><code>broken_warp</code> / <code>surface_mark</code></td><td>双向混淆，标签噪声</td></tr>
+<tr><td>纬缩 ↔ 粗纬</td><td><code>weft_shrink</code> / <code>coarse_weft</code></td><td>双向混淆，标签噪声</td></tr>
+</tbody>
+</table>
+
+<p>合并后关键类召回显著回升：纬缩+粗纬 <strong>0.40 → 0.88</strong>，断经+磨痕 <strong>0.52 → 0.79</strong>。</p>
+
+<h1 id="section-4">第二章 数据从哪来、怎么洗、怎么进模型</h1>
+
+<h2>2.1 数据采集：为什么用公开竞赛数据集</h2>
+
+<p>数据来自阿里天池公开竞赛「智能织物瑕疵诊断赛」，赛题代号 <code>smartdiagnosisofclothflaw</code>，提供 5 个压缩包。选择公开数据集而非自采有三个理由：</p>
+
+<table>
+<thead><tr><th>维度</th><th>自采数据</th><th>天池数据（项目选择）</th></tr></thead>
+<tbody>
+<tr><td>标注成本</td><td>一张图一个框，人工成本极高</td><td>官方已标好 8570 个框</td></tr>
+<tr><td>可比性</td><td>无法与他人结果对比</td><td>赛题统一口径，可比公开方法</td></tr>
+<tr><td>版权</td><td>产线数据多涉商业机密</td><td>公开可商用</td></tr>
+</tbody>
+</table>
+
+<h2>2.2 原始数据结构</h2>
+
+<table>
+<thead><tr><th>数据集</th><th>缺陷图数</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>train1 partA</td><td>2387 张</td><td>广东产线，带标注</td></tr>
+<tr><td>train1 partB</td><td>2387 张</td><td><strong>与 partA 内容重复</strong>，见 2.3</td></tr>
+<tr><td>train2</td><td>1139 张</td><td>另一批产线，带标注</td></tr>
+<tr><td>testA / testB</td><td>无标注</td><td>仅推理用</td></tr>
+</tbody>
+</table>
+
+<p>原始数据采用<strong>两分类目录结构</strong>，这是天池数据集的特色：</p>
+
+<pre><code>defect_Images/     缺陷图（有标注）
+normal_Images/     正常图（无标注）
+Annotations/anno_train.json   全部标注
+
+标注 JSON 格式：
+{"name": "图片文件名.jpg", "defect_name": "断经", "bbox": [xmin, ymin, xmax, ymax]}</code></pre>
+
+<h2>2.3 清洗办法一：哈希级去重</h2>
+
+<p><strong>这是一个真实存在的坑。</strong>用 md5 校验发现 partA 与 partB 的标注文件字节级完全相同：</p>
+
+<pre><code>8ca9efa45e3f4ade805a12019a5880a3  partA/Annotations/anno_train.json
+8ca9efa45e3f4ade805a12019a5880a3  partB/Annotations/anno_train.json</code></pre>
+
+<p>若直接遍历三个目录累加，同一张图会被写入两遍，<strong>GT 框数量直接翻倍</strong>，训练时的正负样本比完全失真。</p>
+
+<pre><code># scripts/convert_tianchi_to_yolo.py · convert_train_dir()
+dst_img = os.path.join(out_images, fname)
+if os.path.exists(dst_img):
+    print(f"  [warn] duplicate image name skipped: {fname}")
+    continue    # 按图像名去重，而非按标注条数累加
+shutil.copy(src, dst_img)</code></pre>
+
+<blockquote><p><strong>教学点</strong>：数据清洗中的「去重」必须明确<strong>按什么键去重</strong>。图像按文件名去重，标注按 <code>(name, bbox)</code> 元组去重，两者策略不同。用错键是数据污染的主要来源。</p></blockquote>
+
+<p>另外提示一点：<code>__MACOSX/</code> 目录里还有 AppleDouble 元数据文件（<code>._anno_train.json</code>），是解压 macOS 压缩包时的残留物。这类垃圾文件必须排除，否则可能被误当作标注读取。</p>
+
+<h2>2.4 清洗办法二：格式转换与坐标归一化</h2>
+
+<p>天池用 <code>xyxy</code> 像素坐标，YOLO 格式用 <code>cxcywh</code> 归一化坐标，转换函数如下：</p>
+
+<pre><code># scripts/convert_tianchi_to_yolo.py
+def xyxy_to_yolo(bbox, w, h):
+    """Convert xyxy pixel bbox to normalized (cx, cy, bw, bh)."""
+    xmin, ymin, xmax, ymax = (float(v) for v in bbox)
+    cx = (xmin + xmax) / 2.0 / w        # 中心点 x
+    cy = (ymin + ymax) / 2.0 / h        # 中心点 y
+    bw = max(0.0, (xmax - xmin)) / w    # 宽度，max 防负
+    bh = max(0.0, (ymax - ymin)) / h    # 高度，max 防负
+    cx, cy = min(max(cx, 0.0), 1.0), min(max(cy, 0.0), 1.0)   # 双向钳制
+    return cx, cy, bw, bh</code></pre>
+
+<p><strong>为什么要归一化到 0~1</strong>：让标注与图像分辨率解耦。无论原图是 2446×1000 还是 1280×1280，标签格式统一，模型才能泛化到不同尺寸。</p>
+
+<p><strong>三处防御值得单独讲</strong>：</p>
+<ol>
+<li><code>max(0.0, ...)</code> —— 防止负宽度</li>
+<li><code>min(max(cx, 0.0), 1.0)</code> —— 双向钳制，防止越界坐标</li>
+<li>写入时保留六位小数 —— <code>f"{cx:.6f}"</code>。<strong>浮点精度不足会让退化框（如宽度 0.0001）被截断为 0，直接丢框</strong></li>
+</ol>
+
+<h2>2.5 清洗办法三：负样本保留与别名归并</h2>
+
+<p><strong>负样本</strong>（<code>normal_Images</code> 中的正常图）写成<strong>空的 .txt 文件</strong>：</p>
+
+<pre><code>label_path = os.path.join(out_labels, os.path.splitext(fname)[0] + ".txt")
+with open(label_path, "w", encoding="utf-8") as f:
+    f.write("\n".join(lines) + ("\n" if lines else ""))   # lines 为空 → 空文件</code></pre>
+
+<blockquote><p><strong>为什么空文件也算数据</strong>：检测任务必须见过「什么都没有」的图，否则模型会在完好织物上乱框。实测验证集 957 张里有 <strong>374 张是负样本，占 39%</strong>——这就是真实产线的先验分布。</p></blockquote>
+
+<p><strong>别名归并与错别字容错</strong>：</p>
+
+<pre><code>NAME_TO_CATEGORY: Dict[str, int] = {
+    "破洞": 1,
+    "水渍": 2, "油渍": 2, "污渍": 2,        # 三个同义名归并为一类
+    # ...
+    "粗纬": 12,
+    "粗维": 12,  # 粗维是官方 README 的错别字
+    "星跳": 16,
+    "跳花": 16,   # 同义缺陷名归并
+    # ...
+}</code></pre>
+
+<blockquote><p><strong>教学点</strong>：竞赛数据的常态就是别名混杂 + 官方文档笔误。别名归并是最容易被忽略、却最影响最终指标的一环。</p></blockquote>
+
+<h2>2.6 划分顺序：先去重，再划分</h2>
+
+<pre><code># scripts/convert_tianchi_to_yolo.py · split_train_val()
+def split_train_val(root, val_ratio, seed):
+    all_images = sorted(os.listdir(staging_img))
+    random.seed(seed)              # 固定种子，结果可复现
+    random.shuffle(all_images)
+    n_val = int(len(all_images) * val_ratio)
+    val_set = set(all_images[:n_val])</code></pre>
+
+<blockquote><p><strong>注意顺序</strong>：先去重→ 再划分。如果先分别划分再合并，partA 的图可能进 train 而 partB 的同名图进 val，<strong>验证集就泄漏进了训练集</strong>，指标虚高且不可复现。</p></blockquote>
+
+<p>清洗后的最终规模（实测统计）：</p>
+
+<table>
+<thead><tr><th>集合</th><th>图像数</th><th>标注框数</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td>训练集 train</td><td>8619</td><td>8570</td><td>18 类，长尾明显</td></tr>
+<tr><td>验证集 val</td><td>957</td><td>953</td><td>含 374 张负样本，seed 42</td></tr>
+</tbody>
+</table>
+
+<h2>2.7 图像如何输入模型</h2>
+
+<p><strong>这是最容易讲错的一环</strong>——项目里有两套预处理，用错一套推理结果就是错的。RT-DETR 的专用预处理（<code>backend/inference/rtdetr_onnx.py</code>）：</p>
+
+<pre><code>def preprocess(self, image_bgr: np.ndarray) -> np.ndarray:
+    """Convert a BGR (H, W, 3) uint8 image to a (1, 3, imgsz, imgsz) tensor."""
+    import cv2
+    resized = cv2.resize(image_bgr, (self.imgsz, self.imgsz))  # 拉伸成正方形
+    rgb = resized[:, :, ::-1]                                  # BGR → RGB
+    tensor = rgb.transpose(2, 0, 1).astype(np.float32) / 255.0 # 只除 255
+    return np.ascontiguousarray(tensor[None, ...])</code></pre>
+
+<p><strong>完整的五步链路</strong>：</p>
+<ol>
+<li><strong>原始图像</strong> <code>H×W×3 uint8 BGR</code>，典型尺寸 2446×1000</li>
+<li><strong>拉伸缩放</strong> <code>cv2.resize(img, (1280, 1280))</code>，不等比拉伸、无灰边填充</li>
+<li><strong>通道转换</strong> <code>resized[:, :, ::-1]</code>，切片负步长，零内存拷贝</li>
+<li><strong>归一化</strong> 转 CHW 后除以 255.0，<strong>不做</strong> ImageNet均值方差</li>
+<li><strong>网络输入</strong> <code>(1, 3, 1280, 1280) float32</code>，取值区间 0.0 ~ 1.0</li>
+</ol>
+
+<p><strong>两套预处理的差异对照</strong>（答辩高频考点）：</p>
+
+<table>
+<thead><tr><th>项目</th><th>通用预处理</th><th>RT-DETR 预处理</th></tr></thead>
+<tbody>
+<tr><td>缩放方式</td><td>letterbox（等比 + 填充黑边）</td><td><strong>scale_fill（不等比拉伸）</strong></td></tr>
+<tr><td>归一化</td><td>ImageNet mean/std</td><td><strong>只除 255.0</strong></td></tr>
+</tbody>
+</table>
+
+<blockquote><p><strong>为什么必须用拉伸而不是填充</strong>：<code>letterbox</code> 会引入黑边，模型训练时没见过黑边，推理时突然出现会造成分布偏移。更重要的是——因为是不等比拉伸，<strong>归一化坐标反变换回原图时只需乘以原始宽高</strong>，无需还原 padding 偏移量。</p></blockquote>
+
+<p>模型输出是单个 <code>(1, 300, 6)</code> 张量，格式 <code>[cx, cy, w, h, score, class]</code>，<strong>没有 objectness 通道，且不需要 NMS</strong>。</p>
+
+<h1 id="section-5">第三章 模型是怎么训练的</h1>
+
+<h2>3.1 起点：COCO 预训练权重</h2>
+
+<pre><code># scripts/train_rtdetr.py
+model = YOLO(args.model)      # 默认 rtdetr-l.pt，COCO 80 类预训练
+model.train(
+    data=args.data,           # data/tianchi/data.yaml
+    epochs=args.epochs,       # 60
+    imgsz=args.imgsz,         # 1280
+    batch=args.batch,         # 4
+    amp=args.amp,             # 必须 False，理由见 6.2
+    seed=42,
+)</code></pre>
+
+<p>这是<strong>迁移学习</strong>的标准做法：用 COCO（自然图像，80 类通用物体）预训练权重初始化，再在织物瑕疵数据上微调。理由很实际：织物纹理的边缘、纤维走向与自然图像差别很大，但底层特征（边缘、纹理、形状）可以复用。</p>
+
+<h2>3.2 最佳配方及其实验依据</h2>
+
+<pre><code># scripts/train_mosaic1280.py（实测最优，官方口径 mean mAP = 0.6349）
+model.train(
+    data="data/tianchi/data.yaml",
+    imgsz=1280, epochs=60, patience=20, batch=4, workers=0,
+    rect=True,                  # 矩形批次：按图片真实长宽比组批
+    mosaic=1.0,                 # Mosaic 四图拼接增强
+    optimizer="auto",           # MuSGD，注意：不要换成 AdamW
+    amp=True,                   # 已 monkey patch 为 bf16
+    seed=42, lr0=0.0005, lrf=0.01,
+)</code></pre>
+
+<p>每一项都有实验依据，来自<strong>因子解耦实验</strong>（单变量对照）：</p>
+
+<table>
+<thead><tr><th>实验臂</th><th>变化</th><th>mean mAP</th><th>增量</th></tr></thead>
+<tbody>
+<tr><td>基线</td><td>1280 方形，无 mosaic</td><td>0.5719</td><td>—</td></tr>
+<tr><td>加 rect</td><td>矩形批次</td><td>0.6080</td><td><strong>+0.036</strong></td></tr>
+<tr><td>再加 mosaic</td><td>四图增强</td><td><strong>0.6349</strong></td><td><strong>+0.027</strong></td></tr>
+<tr><td>换 1536</td><td>更高分辨率</td><td>0.6077</td><td><strong>−0.027（无净增益）</strong></td></tr>
+</tbody>
+</table>
+
+<blockquote><p><strong>反直觉结论，值得单独讲</strong>：分辨率从 1280 提到 1536 反而变差。因为原图只有 2446×1000，无限拉伸到更高分辨率只是放大噪声，还要付出 25% 的时间代价。「更高分辨率一定更好」是常见的直觉错误。</p></blockquote>
+
+<p><code>rect=True</code> 的额外收益：按图片真实长宽比组批，避免大量填充浪费算力，<strong>节省 59%</strong> 计算量。</p>
+
+<h1 id="section-6">第四章 微调了哪些部分</h1>
+
+<h2>4.1 结论先行：全参数微调，唯一重建的是分类头</h2>
+
+<table>
+<thead><tr><th>模块</th><th>初始化方式</th><th>是否冻结</th></tr></thead>
+<tbody>
+<tr><td>Backbone（ResNet + 混合注意力）</td><td>COCO 预训练权重</td><td>全参数微调</td></tr>
+<tr><td>Neck（FPN 多尺度融合）</td><td>COCO 预训练权重</td><td>全参数微调</td></tr>
+<tr><td>Decoder（可变形注意力，6 层）</td><td>COCO 预训练权重</td><td>全参数微调</td></tr>
+<tr><td><strong>分类回归头</strong>（focal/vfl）</td><td><strong>80 类 → 18 类，权重重新初始化</strong></td><td>从头学习</td></tr>
+</tbody>
+</table>
+
+<p><strong>分类头为什么必须重建</strong>：<code>rtdetr-l.pt</code> 最后一层为 COCO 的 80 个物体设计，输出维度是 80。本项目是 18 类，维度不匹配，所以 ultralytics 加载 <code>data.yaml</code> 时自动重建该头，<strong>权重随机初始化、从零学</strong>。而前面三层学到的边缘与纹理知识完整保留。</p>
+
+<p><strong>注意：本项目没有冻结任何层。</strong>项目中唯一用到的「冻结」出现在另一个实验—— 3 族粗分类器的<strong>冻结线性探针</strong>（<code>--frozen</code> 模式，冻结骨干只训分类头），用于对比表征质量。结果：非冻结微调 top-1 = 0.9119，冻结线性探针 = 0.8835，相差 0.028。</p>
+
+<h2>4.2 真正的创新：损失函数层面的注入</h2>
+
+<p>从「改了哪些权重」看，这就是标准全参数微调。<strong>项目的创新不在权重，在损失函数。</strong></p>
+
+<p><strong>实现方式：子类化 ultralytics 的 criterion，追加一个损失项。</strong></p>
+
+<pre><code># backend/training/reward_rtdetr.py
+class RewardRTDETRDetectionLoss(RTDETRDetectionLoss):
+    """RT-DETR criterion that appends a differentiable scalar-reward loss term."""
+
+    def forward(self, preds, batch, dn_bboxes=None, dn_scores=None, dn_meta=None):
+        # 先算原生三项损失
+        loss = super().forward(preds, batch,
+                               dn_bboxes=dn_bboxes, dn_scores=dn_scores, dn_meta=dn_meta)
+        dec_bboxes, dec_scores = preds
+        # 再挂一个奖励项
+        loss["loss_reward"] = self._reward_loss(dec_bboxes[-1], dec_scores[-1], batch)
+        return loss</code></pre>
+
+<blockquote><p><strong>为什么这样写很聪明</strong>：ultralytics 的 <code>RTDETRDetectionModel.loss()</code> 会把 criterion 返回字典里的<strong>每一项都加起来</strong>。所以只要往字典里塞一个 <code>loss_reward</code> 键，奖励就自动被折进监督目标，<strong>完全不用改动 ultralytics 的训练循环</strong>。这是「最小侵入式扩展」——升级框架版本时这段代码依然有效。</p></blockquote>
+
+<p>最终的损失函数组成：</p>
+
+<pre><code>L_total = L_giou + L_class(VFL) + L_bbox(L1) + β × (−R_scalar)
+          └────── 原生三项 ──────┘└──── 本项目注入 ────┘</code></pre>
+
+<p><code>β</code> 是超参数：<code>β=0</code> 即退化为纯监督训练，作为 A/B 对照基线。</p>
+
+<h2>4.3 奖励算在哪一步：复用匈牙利匹配</h2>
+
+<pre><code>def _reward_loss(self, pred_bboxes, pred_scores, batch):
+    # 关键：调用的是同一个 matcher、同一批输入
+    match_indices = self.matcher(
+        pred_bboxes, pred_scores, batch["bboxes"], batch["cls"], batch["gt_groups"]
+    )</code></pre>
+
+<blockquote><p><strong>含义很重要</strong>：奖励只评价监督信号已经选中的那些检测对，不会另起一套标准。奖励的唯一职责，是补充 CE + GIoU + denoising 无法表达的关键类召回信号。</p></blockquote>
+
+<h2>4.4 最有价值的一处细节：如何处理「漏检」</h2>
+
+<pre><code># 关键认知：RT-DETR 的匈牙利匹配把每个 GT 都分配给一个 query（因为 N >= num_gt）
+# 所以「漏检」不是没有匹配的框，而是「匹配上的那个 query 对关键类置信度太低」
+if self._p_crit(pred_scores[i][gt_to_query[g]], class_ids) >= self.miss_threshold:
+    continue
+spare = self._best_spare_query(i, class_ids, matched, pred_scores)  # 找个空闲 query
+pred_boxes.append(pred_bboxes[i][spare])
+targets.append({"boxes": [batch["bboxes"][g].tolist()], "labels": [label]})</code></pre>
+
+<p>这是一个<strong>真实的认知纠错</strong>：传统检测器（YOLO）中漏检 = 没有匹配的框；但 DETR 系因为查询数 ≥ GT 数，<strong>每个 GT 一定有 query 被分配</strong>。</p>
+
+<p>代码的做法是：拿一个<strong>空闲的 spare query</strong> 去指向这个漏检的 GT，让奖励项去惩罚它。这等于强行给一个空闲 query 施加召回压力——<strong>而不是让漏检变成零梯度</strong>。</p>
+
+<h1 id="section-7">第五章 七维可微奖励：算法内核</h1>
+
+<h2>5.1 为什么必须「可微」</h2>
+
+<p>传统强化学习里最著名的问题是 <strong>REINFORCE 梯度消失</strong>：用 <code>argmax</code> 做决策时，梯度为 0，模型学不动。解决办法是把硬决策替换为软指示：</p>
+
+<table>
+<thead><tr><th>硬决策</th><th>替换为</th><th>是否可微</th></tr></thead>
+<tbody>
+<tr><td><code>argmax</code></td><td><code>softmax(logits)</code> 概率质量</td><td>可微</td></tr>
+<tr><td>硬 IoU 阈值比较</td><td><code>sigmoid((θ − IoU) / τ)</code></td><td>可微</td></tr>
+<tr><td>Python <code>max()</code></td><td><code>torch.maximum()</code></td><td>可微</td></tr>
+</tbody>
+</table>
+
+<h2>5.2 七个维度定义</h2>
+
+<table>
+<thead><tr><th>维度</th><th>公式</th><th>取值范围</th><th>对应硬决策</th></tr></thead>
+<tbody>
+<tr><td>D01 定位</td><td><code>2·IoU − 1</code></td><td>[−1, 1]</td><td>硬 IoU</td></tr>
+<tr><td>D02 分类</td><td><code>2·p_true − 1</code></td><td>[−1, 1]</td><td><code>argmax</code></td></tr>
+<tr><td>D03 校准</td><td><code>−|conf − p_true|</code></td><td>[−1, 0]</td><td>置信度比较</td></tr>
+<tr><td>D04 漏检</td><td><code>−λ·sigmoid((θ−IoU)/τ)</code></td><td>[−λ, 0]</td><td>阈值判断</td></tr>
+<tr><td>D05 误检</td><td><code>−λ·conf·(1−matched)</code></td><td>[−λ, 0]</td><td>阈值判断</td></tr>
+<tr><td>D06 断经敏感</td><td><code>3·p_crit − 2</code></td><td>[−2, 1]</td><td>预测类是否属关键集</td></tr>
+<tr><td>D07 跳花敏感</td><td><code>3·p_crit − 2</code></td><td>[−2, 1]</td><td>预测类是否属关键集</td></tr>
+</tbody>
+</table>
+
+<h2>5.3 可微 IoU 的实现</h2>
+
+<pre><code># backend/training/dimension_rewards.py
+def differentiable_iou(pred_boxes, gt_boxes, eps=1e-6):
+    """Vectorized, differentiable IoU for boxes in [x, y, w, h] format."""
+    px1, py1, pw, ph = pred_boxes.unbind(1)     # unbind 而非切片，保持梯度
+    gx1, gy1, gw, gh = gt_boxes.unbind(1)
+    px2, py2 = px1 + pw, py1 + ph
+    gx2, gy2 = gx1 + gw, gy1 + gh
+
+    ix1 = torch.maximum(px1, gx1)   # ← torch 版本才有梯度
+    iy1 = torch.maximum(py1, gy1)
+    ix2 = torch.minimum(px2, gx2)
+    iy2 = torch.minimum(py2, gy2)
+
+    inter = torch.clamp(ix2 - ix1, min=0.0) * torch.clamp(iy2 - iy1, min=0.0)
+    union = pw * ph + gw * gh - inter
+    return inter / (union + eps)</code></pre>
+
+<blockquote><p><strong>关键点</strong>：必须用 <code>torch.maximum</code> / <code>torch.minimum</code>（可微算子），<strong>不能</strong>用 Python 内置的 <code>max()</code> / <code>min()</code>。后者会直接切断计算图，<code>loss.backward()</code> 抛异常。<code>clamp(min=0.0)</code> 是 IoU 的常规保护——两框不相交时交集面积为负，必须截断到 0。</p></blockquote>
+
+<h2>5.4 D02：用 softmax 代替 argmax</h2>
+
+<pre><code>def compute_cls_reward(self, predictions, targets):
+    """R_cls = mean(2 * p_true_i - 1)"""
+    logits, labels = self._aligned_logits_labels(predictions, targets)
+    probs = self._class_probs(logits)                          # softmax
+    p_true = probs.gather(1, labels.unsqueeze(1)).squeeze(1)   # GT 类上的概率质量
+    return (2.0 * p_true - 1.0).mean()</code></pre>
+
+<blockquote><p><strong>对照梯度公式</strong>：softmax + 交叉熵的梯度是 <code>∂loss/∂z = p − onehot(y)</code>。当真实类概率被压到 0 时，梯度不是 0 而是接近 −1，模型仍能学习。而 argmax 硬决策直接让梯度归零。<strong>这就是可微设计的全部意义。</strong></p></blockquote>
+
+<h2>5.5 D06/D07：关键类集合的软敏感度</h2>
+
+<pre><code>def _sensitivity_reward(self, predictions, targets, class_ids):
+    ids = torch.as_tensor(sorted(class_ids), dtype=torch.long, device=logits.device)
+    probs = self._class_probs(logits)
+    if self.head_type == "sigmoid":
+        p_crit = probs[:, ids].max(dim=1).values    # 逐类头：取最大值
+    else:
+        p_crit = probs[:, ids].sum(dim=1)         # softmax 头：求概率质量
+    is_crit = (labels.unsqueeze(1) == ids.unsqueeze(0)).any(dim=1)
+    reward = torch.where(is_crit, 3.0 * p_crit - 2.0, torch.zeros_like(p_crit))
+    return reward.mean()</code></pre>
+
+<p>三个设计要点：</p>
+<ol>
+<li><strong>没有硬编码单个类别</strong>，而是把 <code>{9, 15}</code> 当作集合算概率质量</li>
+<li><strong>外积判定</strong> <code>labels.unsqueeze(1) == ids.unsqueeze(0)</code> 判断样本是否属于该集合，非关键类样本贡献 0</li>
+<li><strong>兼容两种检测头</strong>：<code>head_type</code> 区分 softmax（单标签头）与 sigmoid（RT-DETR 的逐类 focal/vfl 头）</li>
+</ol>
+
+<h2>5.6 可学习维度权重</h2>
+
+<pre><code># backend/training/hybrid_reward_trainer.py
+self.dim_weights = nn.Parameter(
+    torch.ones(NUM_DIMENSIONS, device=self.device) / NUM_DIMENSIONS
+)
+self.optimizer = optim.AdamW(
+    [*list(model.parameters()), self.dim_weights],   # ← 权重与模型同一个优化器
+    lr=learning_rate, weight_decay=weight_decay,
+)
+self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=200)</code></pre>
+
+<blockquote><p><strong>这是「可学习权重」而非「手工调权重」</strong>：七维的重要性不写死在超参里，而是当成参数让梯度自己去调，同时与模型参数一起被优化器更新。</p></blockquote>
+
+<h2>5.7 损失函数实现</h2>
+
+<pre><code># backend/training/loss_functions.py
+def detection_loss(predictions, targets):
+    """Standard detection loss: classification CE + bounding box regression."""
+    loss = loss + F.cross_entropy(logits, target_tensor)      # 分类项
+    loss = loss + F.smooth_l1_loss(p_box, t_box)# 回归项
+    return loss
+
+def scalar_reward_loss(dim_rewards, dim_weights, consistency_coeff=0.3):
+    """L_scalar = -R_scalar（最大化奖励，故取负）"""
+    reward_tensor = torch.stack([dim_rewards[name] for name in DIMENSION_NAMES])
+    return -(dim_weights * reward_tensor).sum() + ...</code></pre>
+
+<h1 id="section-8">第六章 两个真实踩过的坑</h1>
+
+<h2>6.1 坑一：梯度裁剪过松导致 NaN</h2>
+
+<p>ultralytics 在训练器里<strong>硬编码</strong>了 <code>clip_grad_norm_(max_norm=10.0)</code>，对 RT-DETR 来说太宽松，是 18 类训练 NaN 发散的元凶之一。</p>
+
+<pre><code># scripts/train_rtdetr.py —— monkey patch 运行时替换
+_orig_clip_grad_norm_ = torch.nn.utils.clip_grad_norm_
+
+def _clip_grad_norm_(parameters, max_norm, *a, **kw):
+    if max_norm > args.clip_grad:     # 默认从 10.0 降到 1.0
+        max_norm = args.clip_grad
+    return _orig_clip_grad_norm_(parameters, max_norm, *a, **kw)
+
+torch.nn.utils.clip_grad_norm_ = _clip_grad_norm_</code></pre>
+
+<blockquote><p><strong>教学点</strong>：这是 <strong>monkey patch（猴子补丁）</strong>——运行时替换库的函数，无需修改库源码。前提是<strong>你得读源码</strong>。不翻 ultralytics 源码，根本不知道这个 10.0 是硬编码的。</p></blockquote>
+
+<h2>6.2 坑二：fp16 导致 BN 层污染（最具隐蔽性）</h2>
+
+<p><strong>现象</strong>：hi1536 v1 实验（fp16）官方口径 mean mAP 只有 0.272，而同配方基线是 0.572。</p>
+
+<p><strong>机理</strong>：</p>
+<ol>
+<li>fp16 最大值是 65504</li>
+<li>neck 中 39 个 BN 层的激活值平方后（200～300 平方）逼近上限</li>
+<li>cuDNN 的 BN 方差统计溢出，导致 <code>running_var</code> 被清零</li>
+<li>推理时 eval 模式要用 <code>sqrt(running_var + eps)</code>，归零后被 <code>eps</code> 放大 100～400 倍</li>
+<li><strong>mAP 直接崩为 0</strong></li>
+</ol>
+
+<p><strong>检测手段</strong>——训练时挂 BN 哨兵：</p>
+
+<pre><code># scripts/train_mosaic1280.py
+def bn_watchdog(trainer):
+    zeroed_all = []
+    for mdl in (trainer.model, getattr(trainer.ema, "ema", None)):
+        if mdl is None:
+            continue
+        sd = mdl.state_dict()
+        zeroed = [k for k, v in sd.items()
+                  if "running_var" in k and v.abs().max().item() == 0]
+        zeroed_all += zeroed
+    with open(HEALTH, "a") as f:
+        f.write(f"epoch {trainer.epoch}: running_var归零层数={len(zeroed_all)}\n")
+    if zeroed_all:
+        raise RuntimeError(f"BN污染: {len(zeroed_all)}层 running_var 归零, 中止训练")
+
+model = RTDETR(INIT)
+model.add_callback("on_train_epoch_end", bn_watchdog)</code></pre>
+
+<blockquote><p><strong>这个坑最阴险的地方</strong>：要<strong>9 个 epoch 以上</strong>才显现。1～2 epoch 的冒烟测试根本测不出来——所以早期曾得出「AMP 无罪」的错误结论，直到长跑才暴露。</p></blockquote>
+
+<p><strong>修复方案：改用 bf16</strong></p>
+
+<pre><code>import ultralytics.utils.torch_utils as TU
+import ultralytics.engine.trainer as TR
+
+def _bf16_autocast(enabled=True, device="cuda"):
+    return torch.amp.autocast(device, dtype=torch.bfloat16, enabled=bool(enabled))
+
+TU.autocast = _bf16_autocast
+TR.autocast = _bf16_autocast
+TR.check_amp = lambda model: True    # 关键：会误判 bf16 并静默退回 fp32</code></pre>
+
+<p><strong>为什么 bf16 能解决</strong>：bf16 的指数位与 fp32 相同（8 位），动态范围与 fp32 一致，不会像 fp16（指数位 5 位，最大 65504）那样溢出。</p>
+
+<p><strong>为什么还要 patch <code>check_amp</code></strong>：ultralytics 的 <code>check_amp</code> 用 <code>atol=0.5</code> 做数值对比测试，会把 bf16 判定为「不支持」然后<strong>静默禁用 AMP</strong>，实际跑成 fp32。必须连它一起 patch。</p>
+
+<h1 id="section-9">第七章 实验结果与诚实的结论</h1>
+
+<h2>7.1 官方指标口径</h2>
+
+<p>天池官方指标 = <strong>mean(mAP@IoU0.1, mAP@IoU0.3, mAP@IoU0.5)</strong>，初赛总分 = <code>0.2 × ACC + 0.8 × mAP</code>。</p>
+
+<blockquote><p><strong>易错点</strong>：只看 mAP@0.5 会低估宽松口径的表现。IoU 0.1 和 0.3 更宽松，对定位精度要求低，分数会明显更高。</p></blockquote>
+
+<h2>7.2 核心结果</h2>
+
+<table>
+<thead><tr><th>配置</th><th>mAP50</th><th>mean mAP</th></tr></thead>
+<tbody>
+<tr><td>20 类基线</td><td>0.596</td><td>0.641</td></tr>
+<tr><td>18 类基线</td><td>0.541</td><td>0.572</td></tr>
+<tr><td>18 类 + rect + mosaic（最佳）</td><td>0.592</td><td><strong>0.6349</strong></td></tr>
+</tbody>
+</table>
+
+<p>与同类公开方法对比（Tianchi 20 类口径）：</p>
+
+<table>
+<thead><tr><th>方法</th><th>mAP50</th></tr></thead>
+<tbody>
+<tr><td>SPFFNet（YOLOv11）</td><td>65.8%</td></tr>
+<tr><td>改进 RT-DETR（浙大学报）</td><td>60.0%</td></tr>
+<tr><td>Fab-ME（YOLOv8s）</td><td>59.4%</td></tr>
+<tr><td><strong>本项目 RT-DETR-L</strong></td><td><strong>59.4%</strong></td></tr>
+</tbody>
+</table>
+
+<h2>7.3 七维奖励的实测效果</h2>
+
+<p><code>β=0.5</code> 与 <code>β=0</code> 对照：</p>
+
+<table>
+<thead><tr><th>指标</th><th>变化</th></tr></thead>
+<tbody>
+<tr><td>全局召回</td><td><strong>+0.030</strong>（0.523 → 0.553）</td></tr>
+<tr><td>精确率</td><td>−0.022</td></tr>
+<tr><td>mAP50</td><td>基本持平（+0.004）</td></tr>
+</tbody>
+</table>
+
+<blockquote><p><strong>为什么召回涨了而 mAP 没涨</strong>：模型把边界框「多报」了一些来提召回，代价是精确率下降。这恰好印证 D04/D05（漏检 vs 误检）这对维度的设计意图——<strong>它在两个目标之间做了一次显式的交易，而不是像加权求和那样糊在一起</strong>。</p></blockquote>
+
+<h2>7.4 必须诚实说明的负面结论</h2>
+
+<p>在更强的基线上，七种训练信号干预<strong>全部输给均匀微调</strong>（七负消融）：</p>
+<ul>
+<li>改权重类干预（R2 / BoxWeighted）、改度量类（NWD）、成本敏感、GRPO 均未转正</li>
+<li>系统性呈现<strong>召回与精度的零和关系</strong>（mean −0.015 ~ −0.029 换 crit_recall +0.10 ~ +0.18）</li>
+<li>唯一明确正结果：<strong>objectness 线性探针</strong>（假阳性率降到 1/2 ~ 1/6）</li>
+<li>Layer-1 可微奖励是唯一零和被打破者，但未过 +0.005 的判定线</li>
+</ul>
+
+<h2>7.5 最有价值的发现：标签噪声天花板</h2>
+
+<p><strong>断经（<code>broken_warp</code>）召回只有约 0.45。</strong>项目做了一整轮排查：奖励注入、GRPO、置信度校准、过采样精调、混淆矩阵 + 裁剪图人工复核。</p>
+
+<p><strong>最终结论</strong>：断经↔磨痕、纬缩↔粗纬在图像上视觉几乎相同、双向混淆，属于<strong>标签噪声，不是模型可训练的差距</strong>。任何训练干预都无法实质提升。合并视觉相同类后召回显著回升（纬缩+粗纬 0.40 → 0.88，断经+磨痕 0.52 → 0.79）。</p>
+
+<blockquote><p><strong>这个案例的教学价值极高</strong>：它区分了「模型不行」和「数据不行」。工业界花大价钱收集标注、修复 label noise，往往比换模型收益更大。</p></blockquote>
+
+<p>由此项目还在<strong>告警层</strong>做了兜底：磨痕（minor）视觉上可能就是断经（critical），告警时按 <code>effective_alert_severity()</code> 升级到 critical 触发停机。存储的 <code>severity</code> 保持规范值，升级级别以 <code>escalated_severity</code> 独立落库，可审计。</p>
+
+<h2>7.6 数据驱动的类别聚类</h2>
+
+<p>项目对 18 类做了层次聚类 + bootstrap 稳定性检验（<code>scripts/cluster_defect_families.py</code>），结论：</p>
+<ul>
+<li><strong>k=3 族稳定</strong>（bootstrap support = 1.00）：线性结构族、斑渍族、点状族</li>
+<li><strong>k=6 族不被数据支持</strong>（稳定性仅 0.286），退化为 3 组 + 3 单例</li>
+</ul>
+
+<p>训练集类别分布为长尾形态，最大类（三丝）1779 个框，最小类（花板跳）117 个框，相差 <strong>15.2 倍</strong>：</p>
+
+<table>
+<thead><tr><th>结构族</th><th>成员类别</th></tr></thead>
+<tbody>
+<tr><td>线性结构族</td><td>三丝、吊经、松经、粗经、星跳、粗纬</td></tr>
+<tr><td>斑渍族</td><td>污渍、浆斑、稀密档、百脚、花板跳</td></tr>
+<tr><td>点状族</td><td>破洞、结头、毛粒、纬缩、整经结、断氨纶</td></tr>
+</tbody>
+</table>
+
+<p>线性结构族内部的跨族互混占全部错误的 <strong>70%</strong>——细线状缺陷的分类天花板由此定位。</p>
+
+<h1 id="section-10">第八章 常见问题</h1>
+
+<p><strong>Q：为什么不用现成的 YOLO？</strong></p>
+<p>RT-DETR 端到端免 NMS，实时性更适合产线；且项目重点在奖励机制，换检测器不影响七维框架——这正是 <code>InferenceEngine</code> 抽象基类的价值所在（<code>backend/inference/engine.py</code> 定义抽象接口，<code>create_engine()</code> 工厂函数在 dummy / onnx / pytorch / rtdetr 四种后端间切换）。</p>
+
+<p><strong>Q：为什么不用自定义 Dataset，直接用 ultralytics 的？</strong></p>
+<p>项目同时保留了两套：<code>backend/training/dataset.py</code> 的 <code>FabricDataset</code> 供自研训练循环使用，<code>scripts/convert_tianchi_to_yolo.py</code> 产出的 YOLO 格式供 ultralytics API 使用。原因是 ultralytics 的验证器与训练器耦合较深，直接复用比重写更可靠。</p>
+
+<p><strong>Q：七维奖励为什么不直接加权求和？</strong></p>
+<p>加权求和会把 [−1, 1] 和 [−2, 1] 不同量纲混在一起，训练不稳定。代码保留了七维原始信号（<code>compute_all</code> 返回字典），再由标量项做归一化聚合，并把维度权重做成可学习参数。</p>
+
+<p><strong>Q：可微奖励真的有效吗？</strong></p>
+<p>诚实回答：<strong>部分有效，且有明确的边界</strong>。在弱基线上，奖励注入使全局召回 +0.030；换到强基线上，七种干预全部输给均匀微调。<strong>把失败实验讲清楚，比只讲成功更能说明什么叫严谨的科研。</strong></p>
+
+<p><strong>Q：worker 数为什么设成 0？</strong></p>
+<p>Windows 平台下多进程 DataLoader 会触发 <code>WinError 1455</code>（内存不足），项目统一设 <code>workers=0</code>。</p>
+
+<p><strong>Q：为什么 optimizer 用 <code>auto</code> 而不是指定 AdamW？</strong></p>
+<p>项目实测：MuSGD 稳定，换 AdamW 会塌陷。<code>optimizer="auto"</code> 时 ultralytics 会自行计算学习率，会忽略传入的 <code>lr0</code>；若要严格使用 <code>lr0</code> 则需显式指定 <code>AdamW</code>。</p>
+
+<h1 id="section-11">附录 一分钟讲稿总结</h1>
+
+<p>数据从天池竞赛平台获取（3 个带标注训练集 + 2 个测试集，共 8570 个标注框）。清洗阶段做了三件事：<strong>哈希级去重</strong>（partA 与 partB 的标注文件字节完全相同，不去重会让 GT 翻倍）、<strong>格式转换与归一化</strong>（xyxy 转 cxcywh，含三处防御性钳制）、<strong>负样本保留</strong>（957 张验证图里 374 张是空的，正是真实产线的先验）。图像以<strong>拉伸缩放到 1280×1280、仅除 255 不做 ImageNet 归一化</strong>的方式输入 RT-DETR。</p>
+
+<p>训练采用 COCO 预训练的 RT-DETR-L 做<strong>全参数微调</strong>，Backbone、Neck、Decoder 全部参与梯度更新，只有 18 类分类头因输出维度不匹配被重建。本项目的创新不在权重而在<strong>损失函数</strong>：通过子类化 ultralytics 的 criterion，在返回值里追加一个基于匈牙利匹配的可微七维奖励项，实现了对第三方框架的零侵入式扩展——只需往损失字典里塞一个键，训练循环自动把它加进去。</p>
+
+<p>过程中踩了两个真实的坑：梯度裁剪过松导致 NaN（通过 monkey patch 把硬编码的 10.0 降到 1.0），以及 fp16 导致 neck 中 39 个 BN 层的 <code>running_var</code> 归零、推理时被 <code>eps</code> 放大百倍使 mAP 崩为 0（改用 bf16 修复，且必须同时 patch <code>check_amp</code> 否则会静默退回 fp32）。后者需要 9 个 epoch 以上才显现，具有很强隐蔽性。</p>
+
+<p>最终官方口径 mean mAP 达到 0.6349。更重要的是，通过一整轮排查我们证明了：<strong>断经召回低是标签噪声造成的天花板，不是模型能力问题</strong>——合并视觉上不可区分的类别后，召回从 0.52 回升到 0.79。这个结论提醒我们，数据质量往往比模型选择更能决定效果上限。</p>
+
+</section>
+</body>
+</html>

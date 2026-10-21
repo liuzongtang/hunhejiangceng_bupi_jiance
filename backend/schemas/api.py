@@ -136,3 +136,31 @@ class SystemStatusResponseData(BaseModel):
     devices: List[DeviceStatus] = Field(default_factory=list)
     model: ModelStatus
     system: SystemMetrics
+
+
+# ============================================================================
+# 3.2.4 Label Feedback API (human-in-the-loop relabel loop, #16)
+# ============================================================================
+
+
+class LabelFeedbackRequest(BaseModel):
+    """Request body for POST /api/v1/feedback — one operator correction.
+
+    ``feedback_type`` is one of ``false_positive`` / ``missed_defect`` /
+    ``misclassification``. ``bbox`` is the normalized YOLO box ``{cx, cy, w, h}``
+    (0..1) of the box to add (missed), correct (misclassification) or suppress
+    (false positive).
+    """
+
+    image_id: str = Field(
+        ..., min_length=1, max_length=128, description="YOLO label stem"
+    )
+    feedback_type: str = Field(
+        ..., description="false_positive / missed_defect / misclassification"
+    )
+    class_id: int = Field(..., ge=0, le=17, description="corrected 18-class id (0..17)")
+    bbox: dict = Field(..., description="{cx, cy, w, h} normalized 0..1")
+    old_class_id: Optional[int] = Field(default=None, ge=0, le=17)
+    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    source: str = Field(default="dashboard")
+    note: Optional[str] = Field(default=None, max_length=256)

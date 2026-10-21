@@ -46,6 +46,12 @@ def main() -> int:
     parser.add_argument("--batch", type=int, default=8)
     parser.add_argument("--lr0", type=float, default=0.0001)
     parser.add_argument(
+        "--amp",
+        action="store_true",
+        help="Enable fp16 AMP (default OFF: fp16 poisons BN running_var at >=9 epochs, "
+        "and the Layer-1 re-test runs 10 epochs — see AMP-BN pollution finding)",
+    )
+    parser.add_argument(
         "--beta", type=float, default=0.5, help="Reward weight (0 = off)"
     )
     parser.add_argument(
@@ -69,6 +75,7 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--project", default="runs/rtdetr-reward")
     parser.add_argument("--name", default="reward_on")
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     args.project = os.path.abspath(args.project)
@@ -231,6 +238,7 @@ def main() -> int:
         imgsz=args.imgsz,
         batch=args.batch,
         lr0=args.lr0,
+        amp=args.amp,
         mosaic=0.0,
         close_mosaic=0,
         patience=20,
@@ -239,7 +247,7 @@ def main() -> int:
         project=args.project,
         name=args.name,
         exist_ok=True,
-        seed=42,
+        seed=args.seed,
     )
     return 0
 

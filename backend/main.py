@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import get_config
 from backend.database import close_db, init_db
-from backend.routers import detection, model, system
+from backend.routers import detection, feedback, model, system
 
 
 @asynccontextmanager
@@ -100,6 +100,7 @@ Backend API for computer-vision-based fabric inspection on production lines.
 
     # Register routers
     app.include_router(detection.router)
+    app.include_router(feedback.router)
     app.include_router(model.router)
     app.include_router(system.router)
     from backend.routers import simulator as simulator_router, storage as storage_router
