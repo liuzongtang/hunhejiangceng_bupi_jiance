@@ -1,0 +1,56 @@
+{
+  "version": 2,
+  "note": "Stage-2 serial GPU queue. Start via the TianchiStage2Queue scheduled task (run_stage2_task.bat), which survives the DSH app closing. Order matters: R3' creates the baseline every later arm is compared against. Add arms only after their PREREG.md exists.",
+  "arms": [
+    {
+      "name": "r3prime_mosaic1280_s42",
+      "notes": "R3': retrain the mosaic1280 baseline from scratch (60 ep, ~15-16 h at workers=4). Replaces handoff R3, which cannot run because the original best.pt is unavailable. Its official mean becomes the new B*.",
+      "requires": ["data/tianchi/data.yaml"],
+      "allow_missing_prereg": true,
+      "prereg_doc": "tianchi_work/PLAN_v1.1.md section 2",
+      "gpu": true,
+      "cmd": ["{py}", "scripts/train_mosaic1280.py"],
+      "resume_if": "runs/rtdetr/tianchi18_mosaic1280/weights/last.pt",
+      "resume_arg": "resume",
+      "log": "logs/stage2_r3prime.log",
+      "eval": {
+        "cmd": [
+          "{py}", "scripts/eval_multIou.py",
+          "--weights", "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt",
+          "--data", "data/tianchi/data.yaml",
+          "--workers", "4",
+          "--out", "runs/multi_iou/r3prime_official.json"
+        ],
+        "json": "runs/multi_iou/r3prime_official.json",
+        "control_key": null
+      }
+    },
+    {
+      "name": "r3pp_uniform_s42",
+      "notes": "R3'': the 5-epoch uniform fine-tune control (mosaic1280 best.pt start, lr0 1e-4, amp OFF, mosaic 0). Becomes the control value for every fine-tune arm (A1/D1/M1/S4), replacing the unreproducible 0.6158 / crit_recall 0.6260.",
+      "requires": [
+        "data/tianchi/data.yaml",
+        "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt"
+      ],
+      "prereg": "runs/stage2/r3pp_uniform/PREREG.md",
+      "gpu": true,
+      "cmd": [
+        "{py}", "scripts/train_adaptive_loss.py",
+        "--method", "uw", "--epochs", "5", "--fraction", "1.0",
+        "--name", "r3pp_uniform_s42", "--seed", "42", "--workers", "4"
+      ],
+      "log": "logs/stage2_r3pp_uniform.log",
+      "eval": {
+        "cmd": [
+          "{py}", "scripts/eval_multIou.py",
+          "--weights", "runs/ablation_adaptive/r3pp_uniform_s42/weights/best.pt",
+          "--data", "data/tianchi/data.yaml",
+          "--workers", "4",
+          "--out", "runs/multi_iou/r3pp_uniform_s42_official.json"
+        ],
+        "json": "runs/multi_iou/r3pp_uniform_s42_official.json",
+        "control_key": "r3prime_mosaic1280_s42"
+      }
+    }
+  ]
+}

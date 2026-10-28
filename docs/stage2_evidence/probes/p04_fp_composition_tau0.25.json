@@ -1,0 +1,108 @@
+{
+  "weights": "C:\\Users\\B6\\Documents\\deepseek-harness\\default-workspace\\repo\\runs\\rtdetr\\tianchi18_mosaic1280\\weights\\best.pt",
+  "data": "C:\\Users\\B6\\Documents\\deepseek-harness\\default-workspace\\repo\\data\\tianchi\\data.yaml",
+  "mode": "fp",
+  "imgsz": 1280,
+  "batch": 8,
+  "ious": [
+    0.1,
+    0.3,
+    0.5
+  ],
+  "val_conf": 0.001,
+  "max_det": 300,
+  "n_classes_present": 18,
+  "n_instances_total": 953,
+  "mAP": null,
+  "per_class": [],
+  "sanity": {
+    "contract": "mode=none must reproduce scripts/eval_multIou.py on the same weights (tianchi18_mosaic1280 best.pt: mean 0.6349, mAP@0.5 0.5917; tianchi18_full best.pt: mAP@0.5 0.541); mode=box and mode=cls mAP must be >= mode=none",
+    "mode": "fp",
+    "eval_multIou_reproduced": null,
+    "baseline_json": "runs\\multi_iou\\handoff_baseline.json",
+    "baseline_loaded": false,
+    "tolerance": 0.0001,
+    "per_iou_delta": null,
+    "max_abs_delta": null,
+    "note": "only mode=none self-checks against eval_multIou; run mode=none with the same weights and compare to verify the contract and the box/cls monotonicity"
+  },
+  "delta_vs_baseline": null,
+  "matching": {
+    "protocol": "one-to-one greedy assignment, candidate pairs taken in descending IoU order (same rule as ultralytics match_predictions)",
+    "iou_thr": 0.5,
+    "box_cls_class_aware": false,
+    "fp_tau": 0.25,
+    "fp_class_aware_tp_iou_0.5": true,
+    "box_oracle_note": null
+  },
+  "env": {
+    "python": "3.12.12",
+    "torch": "2.8.0+cu126",
+    "ultralytics": "8.4.91",
+    "cuda": "NVIDIA GeForce RTX 4090 D",
+    "device_arg": "0"
+  },
+  "mAP_note": "not reported in fp mode (spec: fp reports the FP partition only)",
+  "fp": {
+    "tau": 0.25,
+    "iou_thr": 0.5,
+    "n_images": 957,
+    "n_images_clean": 374,
+    "n_images_defect": 583,
+    "n_preds_above_tau": 2375,
+    "n_tp_above_tau": 743,
+    "n_fp": 1632,
+    "categories": {
+      "background_clean_image": {
+        "count": 120,
+        "share_of_fp": 0.0735,
+        "share_of_preds_above_tau": 0.0505,
+        "description": "FP on an image with no GT (clean image)"
+      },
+      "duplicate_or_neighbour": {
+        "count": 1096,
+        "share_of_fp": 0.6716,
+        "share_of_preds_above_tau": 0.4615,
+        "description": "FP on a defect image explained by an already-matched object (or a residual spurious box, see sub_reasons)",
+        "sub_reasons": {
+          "duplicate_same_class_matched_gt": {
+            "count": 81,
+            "share_of_fp": 0.0496,
+            "share_of_preds_above_tau": 0.0341,
+            "description": "IoU >= iou_thr with an already-matched GT of the predicted class"
+          },
+          "overlaps_matched_pred_box": {
+            "count": 39,
+            "share_of_fp": 0.0239,
+            "share_of_preds_above_tau": 0.0164,
+            "description": "IoU >= iou_thr with an already-matched (TP) prediction box"
+          },
+          "residual_defect_image": {
+            "count": 976,
+            "share_of_fp": 0.598,
+            "share_of_preds_above_tau": 0.4109,
+            "description": "residual FP on a defect image: no >= iou_thr GT overlap and no matched-box overlap (kept in (b) so the partition is exhaustive)"
+          }
+        }
+      },
+      "wrong_class": {
+        "count": 416,
+        "share_of_fp": 0.2549,
+        "share_of_preds_above_tau": 0.1752,
+        "description": "IoU >= iou_thr with a GT of a different class"
+      }
+    },
+    "precedence": [
+      "background_clean_image",
+      "wrong_class",
+      "duplicate_same_class_matched_gt",
+      "overlaps_matched_pred_box",
+      "residual_defect_image"
+    ],
+    "partition_check": {
+      "sum_of_categories": 1632,
+      "n_preds_above_tau_minus_tp": 1632,
+      "equals_n_fp": true
+    }
+  }
+}

@@ -1,0 +1,208 @@
+{
+  "weights": "C:\\Users\\B6\\Documents\\deepseek-harness\\default-workspace\\repo\\runs\\rtdetr-loc\\d1_locreward_s42\\weights\\best.pt",
+  "data": "C:\\Users\\B6\\Documents\\deepseek-harness\\default-workspace\\repo\\data\\tianchi\\data.yaml",
+  "imgsz": 1280,
+  "ious": [
+    0.1,
+    0.3,
+    0.5
+  ],
+  "val_conf": 0.001,
+  "max_det": 300,
+  "n_classes_present": 18,
+  "n_instances_total": 953,
+  "mAP": {
+    "mAP@0.1": 0.6343,
+    "mAP@0.3": 0.6123,
+    "mAP@0.5": 0.5693
+  },
+  "note": "sanity: mAP@0.5 should match training results.csv (tianchi18_full best.pt ~= 0.541)",
+  "per_class": [
+    {
+      "id": 0,
+      "name": "hole",
+      "n_inst": 39,
+      "AP@0.1": 0.8133,
+      "AP@0.3": 0.8133,
+      "AP@0.5": 0.811,
+      "P@maxF1": 0.7668,
+      "R@maxF1": 0.7692
+    },
+    {
+      "id": 1,
+      "name": "stain",
+      "n_inst": 38,
+      "AP@0.1": 0.4362,
+      "AP@0.3": 0.43,
+      "AP@0.5": 0.4038,
+      "P@maxF1": 0.59,
+      "R@maxF1": 0.3421
+    },
+    {
+      "id": 2,
+      "name": "three_silk",
+      "n_inst": 109,
+      "AP@0.1": 0.8079,
+      "AP@0.3": 0.7992,
+      "AP@0.5": 0.7785,
+      "P@maxF1": 0.7236,
+      "R@maxF1": 0.6789
+    },
+    {
+      "id": 3,
+      "name": "knot",
+      "n_inst": 217,
+      "AP@0.1": 0.6408,
+      "AP@0.3": 0.6067,
+      "AP@0.5": 0.5476,
+      "P@maxF1": 0.71,
+      "R@maxF1": 0.474
+    },
+    {
+      "id": 4,
+      "name": "flower_board",
+      "n_inst": 17,
+      "AP@0.1": 0.8824,
+      "AP@0.3": 0.8744,
+      "AP@0.5": 0.8574,
+      "P@maxF1": 0.6659,
+      "R@maxF1": 0.9412
+    },
+    {
+      "id": 5,
+      "name": "hundred_feet",
+      "n_inst": 16,
+      "AP@0.1": 0.4181,
+      "AP@0.3": 0.3538,
+      "AP@0.5": 0.3254,
+      "P@maxF1": 0.3113,
+      "R@maxF1": 0.4525
+    },
+    {
+      "id": 6,
+      "name": "hair_particle",
+      "n_inst": 19,
+      "AP@0.1": 0.2798,
+      "AP@0.3": 0.2794,
+      "AP@0.5": 0.2606,
+      "P@maxF1": 0.4352,
+      "R@maxF1": 0.1579
+    },
+    {
+      "id": 7,
+      "name": "coarse_warp",
+      "n_inst": 18,
+      "AP@0.1": 0.794,
+      "AP@0.3": 0.794,
+      "AP@0.5": 0.794,
+      "P@maxF1": 0.6862,
+      "R@maxF1": 0.851
+    },
+    {
+      "id": 8,
+      "name": "loose_warp",
+      "n_inst": 40,
+      "AP@0.1": 0.8602,
+      "AP@0.3": 0.8461,
+      "AP@0.5": 0.7037,
+      "P@maxF1": 0.8668,
+      "R@maxF1": 0.75
+    },
+    {
+      "id": 9,
+      "name": "broken_warp",
+      "n_inst": 73,
+      "AP@0.1": 0.597,
+      "AP@0.3": 0.4765,
+      "AP@0.5": 0.4478,
+      "P@maxF1": 0.679,
+      "R@maxF1": 0.5342
+    },
+    {
+      "id": 10,
+      "name": "hanging_warp",
+      "n_inst": 15,
+      "AP@0.1": 0.39,
+      "AP@0.3": 0.3892,
+      "AP@0.5": 0.3622,
+      "P@maxF1": 0.3635,
+      "R@maxF1": 0.3333
+    },
+    {
+      "id": 11,
+      "name": "weft_shrink",
+      "n_inst": 138,
+      "AP@0.1": 0.671,
+      "AP@0.3": 0.6289,
+      "AP@0.5": 0.5566,
+      "P@maxF1": 0.7773,
+      "R@maxF1": 0.4493
+    },
+    {
+      "id": 12,
+      "name": "size_stain",
+      "n_inst": 30,
+      "AP@0.1": 0.9189,
+      "AP@0.3": 0.8764,
+      "AP@0.5": 0.718,
+      "P@maxF1": 0.8519,
+      "R@maxF1": 0.9
+    },
+    {
+      "id": 13,
+      "name": "warping_knot",
+      "n_inst": 32,
+      "AP@0.1": 0.5935,
+      "AP@0.3": 0.5745,
+      "AP@0.5": 0.5655,
+      "P@maxF1": 0.4892,
+      "R@maxF1": 0.7188
+    },
+    {
+      "id": 14,
+      "name": "star_skip",
+      "n_inst": 35,
+      "AP@0.1": 0.7348,
+      "AP@0.3": 0.734,
+      "AP@0.5": 0.6332,
+      "P@maxF1": 0.7577,
+      "R@maxF1": 0.6571
+    },
+    {
+      "id": 15,
+      "name": "broken_spandex",
+      "n_inst": 54,
+      "AP@0.1": 0.6339,
+      "AP@0.3": 0.6332,
+      "AP@0.5": 0.6296,
+      "P@maxF1": 0.477,
+      "R@maxF1": 0.7593
+    },
+    {
+      "id": 16,
+      "name": "dense_section",
+      "n_inst": 24,
+      "AP@0.1": 0.3695,
+      "AP@0.3": 0.3398,
+      "AP@0.5": 0.3338,
+      "P@maxF1": 0.5354,
+      "R@maxF1": 0.2408
+    },
+    {
+      "id": 17,
+      "name": "weave_defect",
+      "n_inst": 39,
+      "AP@0.1": 0.5759,
+      "AP@0.3": 0.5712,
+      "AP@0.5": 0.5178,
+      "P@maxF1": 0.5443,
+      "R@maxF1": 0.6154
+    }
+  ],
+  "env": {
+    "python": "3.12.12",
+    "torch": "2.8.0+cu126",
+    "ultralytics": "8.4.91",
+    "cuda": "NVIDIA GeForce RTX 4090 D"
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "weights": "C:\\Users\\B6\\Documents\\deepseek-harness\\default-workspace\\repo\\runs\\rtdetr\\tianchi18_mosaic1280\\weights\\best.pt",
+  "tau": 0.001,
+  "iou_thr": 0.5,
+  "imgsz": 1280,
+  "rect": false,
+  "critical_recall": 0.9761,
+  "per_class": {
+    "hole": {
+      "correct": 38,
+      "misclassified": 1,
+      "missed": 0,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 39,
+      "stolen_by": {
+        "warping_knot": 1
+      }
+    },
+    "stain": {
+      "correct": 31,
+      "misclassified": 2,
+      "missed": 5,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 38,
+      "stolen_by": {
+        "broken_warp": 1,
+        "dense_section": 1
+      }
+    },
+    "three_silk": {
+      "correct": 107,
+      "misclassified": 0,
+      "missed": 2,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 109,
+      "stolen_by": {}
+    },
+    "knot": {
+      "correct": 207,
+      "misclassified": 0,
+      "missed": 10,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 217,
+      "stolen_by": {}
+    },
+    "flower_board": {
+      "correct": 17,
+      "misclassified": 0,
+      "missed": 0,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 17,
+      "stolen_by": {}
+    },
+    "hundred_feet": {
+      "correct": 16,
+      "misclassified": 0,
+      "missed": 0,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 16,
+      "stolen_by": {}
+    },
+    "hair_particle": {
+      "correct": 15,
+      "misclassified": 0,
+      "missed": 4,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 19,
+      "stolen_by": {}
+    },
+    "coarse_warp": {
+      "correct": 18,
+      "misclassified": 0,
+      "missed": 0,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 18,
+      "stolen_by": {}
+    },
+    "loose_warp": {
+      "correct": 37,
+      "misclassified": 0,
+      "missed": 3,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 40,
+      "stolen_by": {}
+    },
+    "broken_warp": {
+      "correct": 71,
+      "misclassified": 0,
+      "missed": 2,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 73,
+      "stolen_by": {}
+    },
+    "hanging_warp": {
+      "correct": 15,
+      "misclassified": 0,
+      "missed": 0,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 15,
+      "stolen_by": {}
+    },
+    "weft_shrink": {
+      "correct": 133,
+      "misclassified": 0,
+      "missed": 5,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 138,
+      "stolen_by": {}
+    },
+    "size_stain": {
+      "correct": 29,
+      "misclassified": 0,
+      "missed": 1,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 30,
+      "stolen_by": {}
+    },
+    "warping_knot": {
+      "correct": 31,
+      "misclassified": 0,
+      "missed": 1,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 32,
+      "stolen_by": {}
+    },
+    "star_skip": {
+      "correct": 33,
+      "misclassified": 1,
+      "missed": 1,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 35,
+      "stolen_by": {
+        "weft_shrink": 1
+      }
+    },
+    "broken_spandex": {
+      "correct": 53,
+      "misclassified": 0,
+      "missed": 1,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 54,
+      "stolen_by": {}
+    },
+    "dense_section": {
+      "correct": 24,
+      "misclassified": 0,
+      "missed": 0,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 24,
+      "stolen_by": {}
+    },
+    "weave_defect": {
+      "correct": 34,
+      "misclassified": 1,
+      "missed": 4,
+      "missed_with_subtau": 0,
+      "missed_subtau_samecls": 0,
+      "total": 39,
+      "stolen_by": {
+        "dense_section": 1
+      }
+    }
+  }
+}

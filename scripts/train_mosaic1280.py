@@ -1,28 +1,29 @@
 """
-阶段1.2a: 1280+mosaic 对照臂 (分离"分辨率"与"mosaic"两因子)
+闃舵1.2a: 1280+mosaic 瀵圭収鑷?(鍒嗙"鍒嗚鲸鐜?涓?mosaic"涓ゅ洜瀛?
 
-目的 (2026-10-17):
-  v4 (1536+mosaic, COCO从头训) 官方口径 mean mAP=0.6094, 超基线
-  (1280, 无mosaic) 0.5719 达 +0.0375。但提升由两个变量共同驱动,
-  需本对照臂分离: 1280+mosaic vs v4(1536+mosaic) vs 基线(1280无mosaic)。
-  若 1280+mosaic ≈ v4 (0.61) => mosaic 是主贡献, 分辨率边际小;
-  若 1280+mosaic ≈ 基线 (0.57) => 分辨率是主贡献。
+鐩殑 (2026-10-17):
+  v4 (1536+mosaic, COCO浠庡ご璁? 瀹樻柟鍙ｅ緞 mean mAP=0.6094, 瓒呭熀绾?
+  (1280, 鏃爉osaic) 0.5719 杈?+0.0375銆備絾鎻愬崌鐢变袱涓彉閲忓叡鍚岄┍鍔?
+  闇€鏈鐓ц噦鍒嗙: 1280+mosaic vs v4(1536+mosaic) vs 鍩虹嚎(1280鏃爉osaic)銆?
+  鑻?1280+mosaic 鈮?v4 (0.61) => mosaic 鏄富璐＄尞, 鍒嗚鲸鐜囪竟闄呭皬;
+  鑻?1280+mosaic 鈮?鍩虹嚎 (0.57) => 鍒嗚鲸鐜囨槸涓昏础鐚€?
 
-配方与 v4 完全一致, 仅 imgsz 1536->1280 (单变量):
+閰嶆柟涓?v4 瀹屽叏涓€鑷? 浠?imgsz 1536->1280 (鍗曞彉閲?:
   COCO init, rect, bf16, MuSGD(auto), lr0=0.0005, lrf=0.01,
-  mosaic=1.0 (e50关), 60ep, patience=20, seed=42, batch=4。
+  mosaic=1.0 (e50鍏?, 60ep, patience=20, seed=42, batch=4銆?
 
-本机坑 (实测, 勿再踩):
+鏈満鍧?(瀹炴祴, 鍕垮啀韪?:
   1. workers=0 (WinError 1455)
-  2. project 绝对路径
-  3. MuSGD 勿换 AdamW (塌陷)
-  4. bf16 需同时补丁 autocast + check_amp (否则静默跑 fp32)
-  5. 用户桌面3D软件抢GPU: 20min/epoch -> 160min/epoch
-  6. BN哨兵每epoch查running_var
+  2. project 缁濆璺緞
+  3. MuSGD 鍕挎崲 AdamW (濉岄櫡)
+  4. bf16 闇€鍚屾椂琛ヤ竵 autocast + check_amp (鍚﹀垯闈欓粯璺?fp32)
+  5. 鐢ㄦ埛妗岄潰3D杞欢鎶PU: 20min/epoch -> 160min/epoch
+  6. BN鍝ㄥ叺姣廵poch鏌unning_var
 """
 
 from pathlib import Path
 import sys
+import os
 
 import torch
 import ultralytics.engine.trainer as TR
@@ -58,35 +59,60 @@ def bn_watchdog(trainer):
         ]
         zeroed_all += zeroed
     with open(HEALTH, "a") as f:
-        f.write(f"epoch {trainer.epoch}: running_var归零层数={len(zeroed_all)}\n")
+        f.write(f"epoch {trainer.epoch}: running_var褰掗浂灞傛暟={len(zeroed_all)}\n")
     if zeroed_all:
         MARKER.write_text(
-            f"epoch {trainer.epoch}: {len(zeroed_all)}层归零 {zeroed_all[:5]}\n"
+            f"epoch {trainer.epoch}: {len(zeroed_all)}灞傚綊闆?{zeroed_all[:5]}\n"
         )
-        raise RuntimeError(f"BN污染: {len(zeroed_all)}层 running_var 归零, 中止训练")
+        raise RuntimeError(f"BN姹℃煋: {len(zeroed_all)}灞?running_var 褰掗浂, 涓璁粌")
 
 
-model = RTDETR(INIT)
-model.add_callback("on_train_epoch_end", bn_watchdog)
+def main() -> int:
+    """Run the recipe.
 
-model.train(
-    data=str(ROOT / "data" / "tianchi" / "data.yaml"),
-    project=PROJECT,
-    name="tianchi18_mosaic1280",
-    imgsz=1280,
-    epochs=60,
-    patience=20,
-    batch=4,
-    workers=0,
-    device=0,
-    rect=True,
-    mosaic=1.0,
-    optimizer="auto",
-    amp=True,  # 已补丁为 bf16
-    seed=42,
-    lr0=0.0005,
-    lrf=0.01,
-    resume=RESUME,
-    exist_ok=True,
-)
-print("training complete")
+    The ``if __name__ == "__main__"`` guard at the bottom is load-bearing: with
+    ``workers > 0`` Windows uses the *spawn* start method, so every dataloader
+    worker re-imports this module. Without the guard each worker re-entered
+    ``model.train()`` and Python aborted with "An attempt has been made to start
+    a new process before the current process has finished its bootstrapping
+    phase". That is why this project historically pinned ``workers=0``; the
+    guard removes the need for that (and is why the smoke arm, which already had
+    one, ran fine at workers=4).
+    """
+    model = RTDETR(INIT)
+    model.add_callback("on_train_epoch_end", bn_watchdog)
+
+    model.train(
+        data=str(ROOT / "data" / "tianchi" / "data.yaml"),
+        project=PROJECT,
+        name="tianchi18_mosaic1280",
+        imgsz=1280,
+        epochs=60,
+        patience=20,
+        batch=4,
+        # 2026-10-21: workers 0 -> TRAIN_WORKERS (default 4). On this machine
+        # workers=0 measured 89.1 s/epoch vs 58.9 s/epoch at workers=4 on the
+        # same 5% subset (GPU util ~70% mean, dipping to ~13% while the loader
+        # starves the GPU). WinError 1455 did not reproduce with 48 GB free RAM.
+        # workers is a throughput knob only -- seed, lr, optimizer, mosaic, rect
+        # and batch are untouched, so the recipe stays comparable to the
+        # historical 0.6349 run.
+        workers=int(os.environ.get("TRAIN_WORKERS", "4")),
+        device=0,
+        rect=True,
+        mosaic=1.0,
+        optimizer="auto",
+        amp=True,  # 宸茶ˉ涓佷负 bf16
+        seed=42,
+        lr0=0.0005,
+        lrf=0.01,
+        resume=RESUME,
+        exist_ok=True,
+    )
+    print("training complete")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+

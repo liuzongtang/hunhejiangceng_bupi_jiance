@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "note": "Probe queue (P0/A2/S0) for the rebuilt baseline. Runs detached as the TianchiStage2Probes scheduled task. Not judgement arms: allow_missing_prereg is set because their criteria live in tianchi_work/PLAN_v1.1.md and the handoff.",
+  "arms": [
+    {
+      "name": "a2_image_replay",
+      "notes": "A2: image-level (good/defect) replay on the new baseline. Replaces the unreproducible 93.73% / AUC 0.9808 reference; the decision-axis question is whether a re-weighted gate beats max_conf at all.",
+      "requires": ["data/tianchi/data.yaml", "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt"],
+      "allow_missing_prereg": true,
+      "gpu": true,
+      "cmd": [
+        "{py}", "scripts/eval_binary_replay.py",
+        "--weights", "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt",
+        "--data", "data/tianchi/data.yaml",
+        "--tag", "r3prime"
+      ],
+      "log": "logs/probe_a2.log"
+    },
+    {
+      "name": "s0_ttc_selection",
+      "notes": "S0: test-time selection over candidate sets (C1 baseline / C2 max_det prefixes / C3 multi-scale TTA + WBF), rules R1 fixed, R2 seven-dim scoring, R3 5-fold crossfit combiner. Verdict withheld unless it beats B*=0.6208 by 0.005.",
+      "requires": ["data/tianchi/data.yaml", "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt"],
+      "allow_missing_prereg": true,
+      "gpu": true,
+      "cmd": [
+        "{py}", "scripts/eval_ttc_selection.py",
+        "--weights", "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt",
+        "--data", "data/tianchi/data.yaml",
+        "--baseline-mean", "0.6208",
+        "--device", "0",
+        "--out", "runs/ttc"
+      ],
+      "log": "logs/probe_s0.log"
+    }
+  ]
+}

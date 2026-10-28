@@ -1,0 +1,191 @@
+{
+  "version": 3,
+  "note": "Batch 2 (resumed 2026-10-23): S0 was run separately and judged NEGATIVE (see runs/ttc/R1..R3; C3 TTA fusion produced mAP50=0.0 so the learned-combiner test only had C1/C2 candidates). Remaining arms: M1 -> D1 -> C1 -> B1.",
+  "arms": [
+    {
+      "name": "m1_aploss_s42",
+      "notes": "M1 Smooth-AP proxy: 5 ep from B*, lr0 5e-5, beta 0.1, T 0.5. Targets the measured FP signature (976 residual boxes + 416 wrong-class = 85% of FP are spurious/ranked boxes). PREREG threshold: mean > 0.6127 (C*+0.005) and crit_recall not lower.",
+      "requires": [
+        "data/tianchi/data.yaml",
+        "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt"
+      ],
+      "prereg": "runs/stage2/m1_aploss/PREREG.md",
+      "gpu": true,
+      "cmd": [
+        "{py}",
+        "scripts/train_rtdetr_aploss.py",
+        "--weights",
+        "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt",
+        "--data",
+        "data/tianchi/data.yaml",
+        "--epochs",
+        "5",
+        "--lr0",
+        "0.00005",
+        "--beta",
+        "0.1",
+        "--temp",
+        "0.5",
+        "--workers",
+        "4",
+        "--seed",
+        "42",
+        "--name",
+        "m1_aploss_s42"
+      ],
+      "log": "logs/stage2_m1_aploss.log",
+      "eval": {
+        "cmd": [
+          "{py}",
+          "scripts/eval_multIou.py",
+          "--weights",
+          "runs/rtdetr-ap/m1_aploss_s42/weights/best.pt",
+          "--data",
+          "data/tianchi/data.yaml",
+          "--workers",
+          "4",
+          "--out",
+          "runs/multi_iou/m1_aploss_s42_official.json"
+        ],
+        "json": "runs/multi_iou/m1_aploss_s42_official.json",
+        "control_key": null
+      }
+    },
+    {
+      "name": "d1_locreward_s42",
+      "notes": "D1 low-IoU localisation reward: 5 ep from B*, lr0 1e-4, beta 0.1, soft-IoU saturating at 0.1/0.3. Additive only (never replaces GIoU/L1). PREREG threshold: mean > 0.6127 with gains concentrated in thin-box classes.",
+      "requires": [
+        "data/tianchi/data.yaml",
+        "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt"
+      ],
+      "prereg": "runs/stage2/d1_locreward/PREREG.md",
+      "gpu": true,
+      "cmd": [
+        "{py}",
+        "scripts/train_rtdetr_locreward.py",
+        "--weights",
+        "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt",
+        "--data",
+        "data/tianchi/data.yaml",
+        "--epochs",
+        "5",
+        "--lr0",
+        "0.0001",
+        "--beta",
+        "0.1",
+        "--workers",
+        "4",
+        "--seed",
+        "42",
+        "--name",
+        "d1_locreward_s42"
+      ],
+      "log": "logs/stage2_d1_locreward.log",
+      "eval": {
+        "cmd": [
+          "{py}",
+          "scripts/eval_multIou.py",
+          "--weights",
+          "runs/rtdetr-loc/d1_locreward_s42/weights/best.pt",
+          "--data",
+          "data/tianchi/data.yaml",
+          "--workers",
+          "4",
+          "--out",
+          "runs/multi_iou/d1_locreward_s42_official.json"
+        ],
+        "json": "runs/multi_iou/d1_locreward_s42_official.json",
+        "control_key": null
+      }
+    },
+    {
+      "name": "c1_earlyreward_s42",
+      "notes": "C1 early-representation reward screen: 60 ep from scratch, identical recipe to B*, reward at beta=0.5 for the first 10 epochs then exactly 0. Control is B* itself (same seed, same recipe, beta=0 throughout). PREREG: screen positive only if mean >= 0.6258.",
+      "requires": [
+        "data/tianchi/data.yaml"
+      ],
+      "prereg": "runs/stage2/c1_earlyreward/PREREG.md",
+      "gpu": true,
+      "cmd": [
+        "{py}",
+        "scripts/train_mosaic1280_earlyreward.py",
+        "--data",
+        "data/tianchi/data.yaml",
+        "--name",
+        "c1_earlyreward_s42",
+        "--seed",
+        "42",
+        "--reward-beta",
+        "0.5",
+        "--reward-epochs",
+        "10",
+        "--workers",
+        "4"
+      ],
+      "log": "logs/stage2_c1_earlyreward.log",
+      "eval": {
+        "cmd": [
+          "{py}",
+          "scripts/eval_multIou.py",
+          "--weights",
+          "runs/rtdetr/c1_earlyreward_s42/weights/best.pt",
+          "--data",
+          "data/tianchi/data.yaml",
+          "--workers",
+          "4",
+          "--out",
+          "runs/multi_iou/c1_earlyreward_s42_official.json"
+        ],
+        "json": "runs/multi_iou/c1_earlyreward_s42_official.json",
+        "control_key": "r3prime_mosaic1280_s42"
+      }
+    },
+    {
+      "name": "b1_family3_s42",
+      "notes": "B1 family detector probe (lowest priority): 18->3 head swap from B*, 20 ep on data/tianchi_family3. PREREG: family AP@0.5 must beat the 18-class-aggregated number by >= 0.02. P0.1 already showed the class axis is empty (0.52% misclassification), so expectation is low.",
+      "requires": [
+        "data/tianchi_family3/data.yaml",
+        "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt"
+      ],
+      "prereg": "runs/stage2/b1_family3/PREREG.md",
+      "gpu": true,
+      "cmd": [
+        "{py}",
+        "scripts/train_family_detector.py",
+        "--init",
+        "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt",
+        "--data",
+        "data/tianchi_family3/data.yaml",
+        "--epochs",
+        "20",
+        "--nc",
+        "3",
+        "--names",
+        "A_linear,B_blotch,C_point",
+        "--workers",
+        "4",
+        "--seed",
+        "42",
+        "--name",
+        "b1_family3_s42"
+      ],
+      "log": "logs/stage2_b1_family3.log",
+      "eval": {
+        "cmd": [
+          "{py}",
+          "scripts/eval_multIou.py",
+          "--weights",
+          "runs/rtdetr-family/b1_family3_s42/weights/best.pt",
+          "--data",
+          "data/tianchi_family3/data.yaml",
+          "--workers",
+          "4",
+          "--out",
+          "runs/multi_iou/b1_family3_s42_official.json"
+        ],
+        "json": "runs/multi_iou/b1_family3_s42_official.json",
+        "control_key": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,225 @@
+{
+  "version": 1,
+  "note": "C1 confirm batch. PAUSED 2026-10-24 13:2x (user paused until Monday; the PC may be shut down). All Tianchi tasks are Disabled. C1 arms carry resume_if so a restart continues from weights/last.pt instead of restarting the epoch budget.",
+  "arms": [
+    {
+      "name": "c1_earlyreward_s123",
+      "notes": "C1 arm seed=123 beta=0.5",
+      "requires": [
+        "data/tianchi/data.yaml"
+      ],
+      "prereg": "runs/stage2/c1_confirm/PREREG.md",
+      "gpu": true,
+      "cmd": [
+        "{py}",
+        "scripts/train_mosaic1280_earlyreward.py",
+        "--data",
+        "data/tianchi/data.yaml",
+        "--name",
+        "c1_earlyreward_s123",
+        "--seed",
+        "123",
+        "--workers",
+        "4",
+        "--reward-beta",
+        "0.5",
+        "--reward-epochs",
+        "10"
+      ],
+      "log": "logs/stage2_c1_earlyreward_s123.log",
+      "eval": {
+        "cmd": [
+          "{py}",
+          "scripts/eval_multIou.py",
+          "--weights",
+          "runs/rtdetr/c1_earlyreward_s123/weights/best.pt",
+          "--data",
+          "data/tianchi/data.yaml",
+          "--workers",
+          "4",
+          "--out",
+          "runs/multi_iou/c1_earlyreward_s123_official.json"
+        ],
+        "json": "runs/multi_iou/c1_earlyreward_s123_official.json",
+        "control_key": null
+      },
+      "resume_if": "runs/rtdetr/c1_earlyreward_s123/weights/last.pt",
+      "resume_arg": "resume"
+    },
+    {
+      "name": "c1_control_s123",
+      "notes": "C1 paired control seed=123 beta=0.0 (supervised only, same recipe)",
+      "requires": [
+        "data/tianchi/data.yaml"
+      ],
+      "prereg": "runs/stage2/c1_confirm/PREREG.md",
+      "gpu": true,
+      "cmd": [
+        "{py}",
+        "scripts/train_mosaic1280_earlyreward.py",
+        "--data",
+        "data/tianchi/data.yaml",
+        "--name",
+        "c1_control_s123",
+        "--seed",
+        "123",
+        "--workers",
+        "4",
+        "--reward-beta",
+        "0.0"
+      ],
+      "log": "logs/stage2_c1_control_s123.log",
+      "eval": {
+        "cmd": [
+          "{py}",
+          "scripts/eval_multIou.py",
+          "--weights",
+          "runs/rtdetr/c1_control_s123/weights/best.pt",
+          "--data",
+          "data/tianchi/data.yaml",
+          "--workers",
+          "4",
+          "--out",
+          "runs/multi_iou/c1_control_s123_official.json"
+        ],
+        "json": "runs/multi_iou/c1_control_s123_official.json",
+        "control_key": null
+      },
+      "resume_if": "runs/rtdetr/c1_control_s123/weights/last.pt",
+      "resume_arg": "resume"
+    },
+    {
+      "name": "c1_earlyreward_s2024",
+      "notes": "C1 arm seed=2024 beta=0.5",
+      "requires": [
+        "data/tianchi/data.yaml"
+      ],
+      "prereg": "runs/stage2/c1_confirm/PREREG.md",
+      "gpu": true,
+      "cmd": [
+        "{py}",
+        "scripts/train_mosaic1280_earlyreward.py",
+        "--data",
+        "data/tianchi/data.yaml",
+        "--name",
+        "c1_earlyreward_s2024",
+        "--seed",
+        "2024",
+        "--workers",
+        "4",
+        "--reward-beta",
+        "0.5",
+        "--reward-epochs",
+        "10"
+      ],
+      "log": "logs/stage2_c1_earlyreward_s2024.log",
+      "eval": {
+        "cmd": [
+          "{py}",
+          "scripts/eval_multIou.py",
+          "--weights",
+          "runs/rtdetr/c1_earlyreward_s2024/weights/best.pt",
+          "--data",
+          "data/tianchi/data.yaml",
+          "--workers",
+          "4",
+          "--out",
+          "runs/multi_iou/c1_earlyreward_s2024_official.json"
+        ],
+        "json": "runs/multi_iou/c1_earlyreward_s2024_official.json",
+        "control_key": null
+      },
+      "resume_if": "runs/rtdetr/c1_earlyreward_s2024/weights/last.pt",
+      "resume_arg": "resume"
+    },
+    {
+      "name": "c1_control_s2024",
+      "notes": "C1 paired control seed=2024 beta=0.0 (supervised only, same recipe)",
+      "requires": [
+        "data/tianchi/data.yaml"
+      ],
+      "prereg": "runs/stage2/c1_confirm/PREREG.md",
+      "gpu": true,
+      "cmd": [
+        "{py}",
+        "scripts/train_mosaic1280_earlyreward.py",
+        "--data",
+        "data/tianchi/data.yaml",
+        "--name",
+        "c1_control_s2024",
+        "--seed",
+        "2024",
+        "--workers",
+        "4",
+        "--reward-beta",
+        "0.0"
+      ],
+      "log": "logs/stage2_c1_control_s2024.log",
+      "eval": {
+        "cmd": [
+          "{py}",
+          "scripts/eval_multIou.py",
+          "--weights",
+          "runs/rtdetr/c1_control_s2024/weights/best.pt",
+          "--data",
+          "data/tianchi/data.yaml",
+          "--workers",
+          "4",
+          "--out",
+          "runs/multi_iou/c1_control_s2024_official.json"
+        ],
+        "json": "runs/multi_iou/c1_control_s2024_official.json",
+        "control_key": null
+      },
+      "resume_if": "runs/rtdetr/c1_control_s2024/weights/last.pt",
+      "resume_arg": "resume"
+    },
+    {
+      "name": "b1_family3_s42",
+      "notes": "B1 family detector probe (retry after the nc-overrides fix). Lowest priority: P0.1 already closed the class axis.",
+      "requires": [
+        "data/tianchi_family3/data.yaml",
+        "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt"
+      ],
+      "prereg": "runs/stage2/b1_family3/PREREG.md",
+      "gpu": true,
+      "cmd": [
+        "{py}",
+        "scripts/train_family_detector.py",
+        "--init",
+        "runs/rtdetr/tianchi18_mosaic1280/weights/best.pt",
+        "--data",
+        "data/tianchi_family3/data.yaml",
+        "--epochs",
+        "20",
+        "--nc",
+        "3",
+        "--names",
+        "A_linear,B_blotch,C_point",
+        "--workers",
+        "4",
+        "--seed",
+        "42",
+        "--name",
+        "b1_family3_s42"
+      ],
+      "log": "logs/stage2_b1_family3.log",
+      "eval": {
+        "cmd": [
+          "{py}",
+          "scripts/eval_multIou.py",
+          "--weights",
+          "runs/rtdetr-family/b1_family3_s42/weights/best.pt",
+          "--data",
+          "data/tianchi_family3/data.yaml",
+          "--workers",
+          "4",
+          "--out",
+          "runs/multi_iou/b1_family3_s42_official.json"
+        ],
+        "json": "runs/multi_iou/b1_family3_s42_official.json",
+        "control_key": null
+      }
+    }
+  ]
+}

@@ -294,3 +294,14 @@ sudo systemctl enable --now fabric-defect
 ## 数据与模型权重
 
 本仓库仅包含源代码。Tianchi 数据集（`smartdiagnosisofclothflaw`）与训练好的模型权重（`runs/rtdetr/tianchi20/weights/`）体积较大，未纳入版本控制，请按需自行获取或训练生成。
+
+## 阶段 2 结果（2026-10-28）
+
+混合奖惩机制重构的完整执行结果见 [docs/stage2_execution_result.md](docs/stage2_execution_result.md)，
+全部数字的来源见 [docs/stage2_evidence/](docs/stage2_evidence/)。要点：
+
+- handoff 提出的四条新位置（决策层 / 子问题层 / 表征层 / 推理层）**全部阴性**；
+- 唯一正结果 C1（早期表征奖励，screen +0.0281）在三种子 confirm 中**翻盘为阴性**
+  （配对差 +0.0282 / −0.0306 / +0.0357）；
+- 实测**运行间方差 0.016–0.036**（文档记 0.0093）→ ±0.005 的判定门在 n=3 下几乎没有统计功效；
+- 产线决策层交付不变：图像级门控 **93.42%**（AUC 0.9786，tau=0.40）。
